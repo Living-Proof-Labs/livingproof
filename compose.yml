@@ -1,0 +1,9 @@
+services:
+  development:
+    build:
+      context: .
+      target: development
+    working_dir: /workspace/livingproof
+    volumes:
+      - .:/workspace/livingproof
+    init: true

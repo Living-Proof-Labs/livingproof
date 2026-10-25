@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Verify development and installed package
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - run: task dev:build
+      - run: task dev:verify
+      - name: Build and consume the installed wheel
+        run: docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && task package && task smoke'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: candidate-package-and-tests
+          path: |
+            artifacts/tests.xml
+            dist/
+          if-no-files-found: error
