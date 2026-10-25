@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+# Requires uv, project Python, pyproject.toml, and uv.lock with Ruff/pytest in dev.
+version: '3'
+
+tasks:
+  setup:
+    desc: Sync locked dependencies into the project environment
+    cmds:
+      - uv sync --locked --no-python-downloads
+  check:
+    desc: Check Python with locked Ruff
+    cmds:
+      - uv run --locked --no-sync --no-python-downloads ruff check .
+  test:
+    desc: Run locked pytest --junitxml=artifacts/tests.xml
+    cmds:
+      - uv run --locked --no-sync --no-python-downloads pytest --junitxml=artifacts/tests.xml
+  verify:
+    desc: Run checks and tests
+    cmds:
+      - task: check
+      - task: test
+  package:
+    desc: Build wheel and source distribution
+    cmds:
+      - uv build --no-sources
+      - uv run --locked --no-sync python tools/checksums.py
+  smoke:
+    desc: Check clean installed wheel consumption
+    cmds:
+      - uv run --locked --no-sync python tools/smoke.py
+  dev:build:
+    platforms: [linux]
+    desc: Build the shared Docker development target
+    cmds:
+      - docker compose build development
+  dev:verify:
+    platforms: [linux]
+    desc: Run setup and verification in the development image without nested Docker
+    cmds:
+      - docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && task verify'
+  dev:shell:
+    platforms: [linux]
+    desc: Open the development image and set up its environment
+    interactive: true
+    cmds:
+      - docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && exec bash'
+  integration:
+    desc: Verify real installed reporting from the pinned published release
+    cmds:
+      - uv run --locked --no-sync python tools/fetch_reporter.py
+      - task: smoke

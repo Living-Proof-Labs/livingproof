@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling==1.27.0", "hatch-vcs==0.5.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "livingproof"
+dynamic = ["version"]
+description = "Living Proof Labs command home for installed capability plugins"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSES/*.txt", "LICENSE.md"]
+dependencies = ["click>=8.1,<9"]
+
+[project.scripts]
+livingproof = "livingproof.cli:main"
+
+[tool.hatch.version]
+source = "vcs"
+[tool.hatch.version.raw-options]
+fallback_version = "0.0.0"
+
+[dependency-groups]
+dev = ["pytest==8.4.2", "ruff==0.14.2", "build==1.3.0"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+[tool.ruff]
+line-length = 100
