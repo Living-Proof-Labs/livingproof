@@ -1,22 +1,23 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-# First release dependency
+# Release operation
 
-Do not publish this candidate until the reporter entry-point metadata has a
-verified release. Current v1.3.0 does not have it. Use that new explicit version
-tag in a hosted consumption job: download its wheel and checksum, install it
-alongside the umbrella wheel, and run the same real reporter smoke test with the
-matching versioned example bundle. No branch or guessed future tag is a substitute.
+The verification workflow tests the same triggering commit using the shared Docker
+and Task environment, including a real installed reporter from the published tag
+in `reporter-release.txt`. The reporter wheel must match its published SHA256SUMS.
 
-After that job succeeds, use
+On main only, verification gates
 `Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v3.0.0`
-with `draft-release: true`, dependent on verification of the same main commit.
-Build the root wheel/source with the returned version (hatch-vcs supports
-`SETUPTOOLS_SCM_PRETEND_VERSION`), verify the installed wheel, upload both assets
-and SHA256SUMS to the draft, then publish. Follow the
-[shared release procedure](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v3.0.0/docs/releases.md).
-Use only the existing repository workflow token; no permissions, token scopes,
-package visibility, security settings or billing changes are authorized here.
+with `draft-release: true`. The dependent publication job builds the returned version,
+tests wheel/source and reporter consumption, attaches all assets/checksums, then
+publishes the draft. An anonymous download and repeated installed smoke verify
+what consumers receive. Release notes live in GitHub Releases.
 
-The current workflow deliberately verifies candidates only. Hosted PR checks,
-main verification, release publication and anonymous asset consumption are still
-required evidence, not implied by local green tests.
+A failed build leaves a draft: inspect it and its assets before recovery, reuse
+that draft, and never retarget tags or overwrite immutable public assets. A failure
+after publication leaves a real release with incomplete verification; report that
+state explicitly. Follow the
+[shared release procedure](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v3.0.0/docs/releases.md).
+
+Only the existing repository workflow token is used for release writes. No token
+grants, repository security settings, package visibility or billing changes belong
+in this workflow. There is no PyPI or container registry publication.

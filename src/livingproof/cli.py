@@ -7,10 +7,10 @@ import click
 
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
-    "Install a plugin-enabled livingproof-capability-report wheel into the same "
-    "Python environment as livingproof. See https://github.com/Living-Proof-Labs/"
-    "livingproof-capability-report/releases/tag/v1.3.0 for the standalone reporter; "
-    "v1.3.0 does not yet publish plugin metadata. No packages are installed automatically."
+    "Install the livingproof-capability-report v1.4.0 wheel into the same Python environment "
+    "as livingproof. Download it and verify SHA256SUMS from https://github.com/"
+    "Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0. "
+    "No packages are installed automatically."
 )
 
 

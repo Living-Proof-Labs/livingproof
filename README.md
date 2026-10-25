@@ -23,7 +23,7 @@ versioned policy-based grade → portable report.**
 4. Apply an explicit, versioned grading policy to decide the final grade. A model's
    proposed grade is an input, not authority to silently replace that policy.
 5. Produce a portable report with the existing
-   [capability reporter v1.3.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.3.0).
+   [capability reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.4.0).
    It validates bundles, grades with its supported policy, and renders saved decisions
    as terminal tables, JSON, HTML or CSV. Evidence stays in the bundle. Rendering
    does not regrade. These fixture demonstrations do not establish robot safety certification.
@@ -33,9 +33,9 @@ versioned policy-based grade → portable report.**
 | Area | Status |
 | --- | --- |
 | Specs, deterministic fixtures, mock AI and recorded human fixture assessments | Existing versioned ecosystem repositories linked above |
-| Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.3.0 |
-| Thin root command and installed Click plugin discovery | Implemented in this source; first hosted release pending |
-| Reporter plugin registration | Prepared as a focused metadata change; v1.3.0 itself has no plugin entry point |
+| Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.4.0 |
+| Thin root command and installed Click plugin discovery | Implemented; wheel and source distributions use the shared release workflow |
+| Reporter plugin registration | Implemented by reporter v1.4.0; its standalone command and library remain independent |
 | Real evaluator/provider integrations and robot/simulator adapters | Candidate designs only; no credentials, model calls or adapters delivered here |
 
 Full MCAP recordings may be evidence inputs. A future adapter may extract signals,
@@ -65,38 +65,44 @@ provider does not make its results compatible with an existing policy automatica
 
 ## Get started
 
-For a released reporting workflow today, follow
-[reporter v1.3.0 installation and usage](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.3.0/README.md)
-and use `livingproof-capability-report`. Its library remains independently importable.
-There is no published umbrella release established by this checkout yet.
-
-To try this candidate, build its wheel using the contributor commands below and
-install it into a Python 3.11+ virtual environment:
+Download the umbrella wheel and `SHA256SUMS` from this repository's
+[Releases](https://github.com/Living-Proof-Labs/livingproof/releases) into a
+`root-release` directory. Select an explicit version and verify the downloaded
+asset against its checksum. Install into a Python 3.11+ virtual environment:
 
 ```sh
-python3 -m venv /tmp/livingproof-demo
-/tmp/livingproof-demo/bin/pip install ./dist/livingproof-*.whl
-/tmp/livingproof-demo/bin/livingproof
-/tmp/livingproof-demo/bin/livingproof capability --help
+(cd root-release && sha256sum --ignore-missing -c SHA256SUMS)
+python3 -m venv .venv
+.venv/bin/pip install ./root-release/livingproof-*.whl
+.venv/bin/livingproof
+.venv/bin/livingproof capability --help
 ```
 
-Install a reporter wheel containing the new plugin metadata into **that same
-virtual environment**, then run:
+The root is useful without plugins. For reporting, download the wheel and checksums
+from [reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0)
+into a separate `reporter-release` directory, then install into **the same environment**:
 
 ```sh
-/tmp/livingproof-demo/bin/pip install /path/to/livingproof_capability_report-*.whl
-/tmp/livingproof-demo/bin/livingproof capability report --help
-/tmp/livingproof-demo/bin/livingproof capability report validate bundle/manifest.json
-/tmp/livingproof-demo/bin/livingproof capability report grade bundle/manifest.json -o report.json
-/tmp/livingproof-demo/bin/livingproof capability report render report.json --format html -o report.html
+(cd reporter-release && sha256sum --ignore-missing -c SHA256SUMS)
+.venv/bin/pip install ./reporter-release/livingproof_capability_report-*.whl
+.venv/bin/livingproof capability report --help
+.venv/bin/livingproof capability report validate bundle/manifest.json
+.venv/bin/livingproof capability report grade bundle/manifest.json -o report.json
+.venv/bin/livingproof capability report render report.json --format html -o report.html
 ```
 
-Choose reviewed, versioned release assets and verify their published checksums.
+Use your portable evidence bundle or the reporter's
+[versioned fixture bundle](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.4.0/examples/bundle).
+The independently installed `livingproof-capability-report` command and Python
+library remain available; see the
+[reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.4.0/README.md).
+
 The umbrella never downloads evidence or installs plugins at runtime. Separate
 pipx environments cannot discover each other's plugins; install into one environment.
-An old reporter without plugin metadata continues to work standalone and is not
-silently adapted by this package. Output files must be new; errors and exit codes
-come from the reporting command unchanged.
+Reporter versions before v1.4.0 continue to work standalone but have no plugin
+registration. Output files must be new; reporting errors and exit codes are
+preserved. Python installers resolve dependencies normally; source distributions
+are also provided. No system-wide pip installation is required.
 
 ### Shell completion
 
@@ -104,6 +110,7 @@ Click supports Bash, Zsh and Fish completion, including installed plugin command
 Generate a script with the installed executable, then source it in your shell:
 
 ```sh
+. .venv/bin/activate
 _LIVINGPROOF_COMPLETE=bash_source livingproof > livingproof-complete.bash
 . ./livingproof-complete.bash
 ```

@@ -34,22 +34,20 @@ the required cross-repository consumption check before delivery; fixtures alone
 are not proof that the real reporter integration works.
 
 Open focused draft PRs first. Run hosted checks before routine tested merges.
-The delivery plan is to call the shared semantic-release workflow at v3.0.0
-after main verification, create a draft, then assemble wheel/source assets, test
-installed consumption and publish that draft. This candidate includes verification
-CI only: release wiring waits for a published reporter plugin tag so hosted
-verification can consume it before any umbrella release. Generated notes live
-on GitHub Releases; do not commit generated version bumps or changelogs.
-No PyPI/container registry publication or settings change is included.
+CI runs the same development image and Task commands. `task integration` downloads
+the exact reporter tag in `reporter-release.txt`, verifies its published wheel
+checksum, obtains that tag's example bundle and runs clean installed consumption.
+These downloads are development/release tooling, never runtime CLI behavior.
+Update the pin deliberately through a PR after verifying the upstream release.
 
-For first publication, create the public repository using Rivet's authenticated
-identity, seed a minimal default branch, then submit this implementation as a draft
-PR. Publish reporter metadata through its focused PR first. Once its verified
-release exists, replace candidate installation guidance with exact released version
-links and run installed reporter consumption in hosted CI before merging the
-umbrella. Until then this source is a locally reviewable candidate, not a delivered
-release. Do not invent a future reporter tag or substitute a moving branch pin.
+The shared semantic-release workflow at v3.0.0 runs after main verification and
+creates a draft. A dependent job builds wheel/source assets using the returned
+version, reruns installed consumption, attaches all assets and SHA256SUMS, then
+publishes. Finally it anonymously downloads the public assets, verifies their
+checksums and repeats installed consumption. Generated notes live on GitHub Releases;
+do not commit generated version bumps or changelogs. No PyPI/container registry
+publication or settings change is included. See [release operation](../.github/RELEASE.md).
 
-Configured CI targets Linux; actual hosted checks and release asset consumption
-must be reported separately from local checks. Other operating systems and live
+Configured CI targets Linux; hosted checks and release asset consumption are
+separate evidence from local checks. Other operating systems and live
 editor/devcontainer launches remain unverified until exercised.

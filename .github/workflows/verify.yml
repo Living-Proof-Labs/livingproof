@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-name: Verify development and installed package
+name: Verify, package and release
 on:
   pull_request:
   push:
@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
@@ -19,8 +20,8 @@ jobs:
           version: '3.54.0'
       - run: task dev:build
       - run: task dev:verify
-      - name: Build and consume the installed wheel
-        run: docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && task package && task smoke'
+      - name: Build and consume with the pinned published reporter
+        run: docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && task package && task integration'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -28,4 +29,56 @@ jobs:
           path: |
             artifacts/tests.xml
             dist/
+          if-no-files-found: error
+  release:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v3.0.0
+    with:
+      draft-release: true
+  publish:
+    needs: release
+    if: needs.release.outputs.draft-created == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.release.outputs.version }}
+      RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - run: task dev:build
+      - name: Assemble and verify the release candidate
+        run: docker compose run --rm --user "$(id -u):$(id -g)" -e SETUPTOOLS_SCM_PRETEND_VERSION development bash -c 'task setup && task package && task integration'
+      - name: Attach all assets before immutable publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+      - name: Publish the tested draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+      - name: Verify anonymous downloads and clean installed consumption
+        run: |
+          mkdir downloaded
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          version="${RELEASE_TAG#v}"
+          curl -fsSL "$base/SHA256SUMS" -o downloaded/SHA256SUMS
+          curl -fsSL "$base/livingproof-${version}-py3-none-any.whl" -o "downloaded/livingproof-${version}-py3-none-any.whl"
+          curl -fsSL "$base/livingproof-${version}.tar.gz" -o "downloaded/livingproof-${version}.tar.gz"
+          (cd downloaded && sha256sum -c SHA256SUMS)
+          docker compose run --rm --user "$(id -u):$(id -g)" -e LIVINGPROOF_DIST=/workspace/livingproof/downloaded development bash -c 'task setup && task smoke'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-assets
+          path: dist/
           if-no-files-found: error

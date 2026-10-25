@@ -20,7 +20,8 @@ def run(args, cwd, expected=0, env=None):
 
 
 def smoke():
-    wheels = list((ROOT / "dist").glob("livingproof-*.whl"))
+    distribution = Path(os.environ.get("LIVINGPROOF_DIST", ROOT / "dist"))
+    wheels = list(distribution.glob("livingproof-*.whl"))
     assert len(wheels) == 1, "Build exactly one candidate wheel first"
     with tempfile.TemporaryDirectory(prefix="livingproof-installed-") as temporary:
         work = Path(temporary)
@@ -83,7 +84,15 @@ def smoke():
             print("PASS: clean installed real reporter delegation, all formats, errors and completion")
         else:
             print("NOT RUN: real reporter consumption (set REPORTER_WHEEL and REPORTER_BUNDLE)")
-        print("PASS: root wheel, missing plugin, installed discovery and completion generation")
+        sources = list(distribution.glob("livingproof-*.tar.gz"))
+        assert len(sources) == 1, "Build exactly one source archive first"
+        venv.create(work / "source-env", with_pip=True)
+        source_bin = work / "source-env" / ("Scripts" if os.name == "nt" else "bin")
+        run([source_bin / "python", "-m", "pip", "install", sources[0]], work)
+        assert "capability" in run([source_bin / "livingproof", "--help"], work)
+        assert run([command, "--version"], work) == run(
+            [source_bin / "livingproof", "--version"], work)
+        print("PASS: root wheel/source, missing plugin, installed discovery and completion generation")
 
 
 if __name__ == "__main__":

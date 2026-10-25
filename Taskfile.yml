@@ -24,6 +24,7 @@ tasks:
     desc: Build wheel and source distribution
     cmds:
       - uv build --no-sources
+      - uv run --locked --no-sync python tools/checksums.py
   smoke:
     desc: Check clean installed wheel consumption
     cmds:
