@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 spec = importlib.util.spec_from_file_location(
-    "fetch_reporter", Path(__file__).resolve().parents[1] / "tools/fetch_reporter.py")
+    "fetch_reporter", Path(__file__).resolve().parents[2] / "tools/fetch_reporter.py")
 fetcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fetcher)
 

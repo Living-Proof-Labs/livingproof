@@ -34,7 +34,7 @@ versioned policy-based grade → portable report.**
 | --- | --- |
 | Specs, deterministic fixtures, mock AI and recorded human fixture assessments | Existing versioned ecosystem repositories linked above |
 | Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.4.0 |
-| Thin root command and installed Click plugin discovery | Implemented; wheel and source distributions use the shared release workflow |
+| Thin root command and installed Click plugin discovery | Implemented; wheel, source, Debian and native container distributions use the shared release workflow |
 | Reporter plugin registration | Implemented by reporter v1.4.0; its standalone command and library remain independent |
 | Real evaluator/provider integrations and robot/simulator adapters | Candidate designs only; no credentials, model calls or adapters delivered here |
 
@@ -65,44 +65,107 @@ provider does not make its results compatible with an existing policy automatica
 
 ## Get started
 
-Download the umbrella wheel and `SHA256SUMS` from this repository's
-[Releases](https://github.com/Living-Proof-Labs/livingproof/releases) into a
-`root-release` directory. Select an explicit version and verify the downloaded
-asset against its checksum. Install into a Python 3.11+ virtual environment:
+Download versioned assets and `SHA256SUMS` from this repository's
+[Releases](https://github.com/Living-Proof-Labs/livingproof/releases).
+Choose one installation route; plugins must use the same Python environment as
+the root command. Nothing is downloaded or installed by the CLI at runtime.
+
+| Route | Root command | Reporter plugin |
+| --- | --- | --- |
+| Debian/Ubuntu | Root `all.deb`, installed with apt | Reporter `all.deb`, installed with apt; both use `/usr/bin/python3` |
+| Python virtual environment | Root wheel or source distribution | Reporter wheel installed into that same virtual environment |
+| Container | Versioned root image | Explicit `-reporting` image variant includes reporter v1.4.0 |
+
+### Debian and Ubuntu
+
+Download the root `.deb` and checksums into `root-release`. Download the reporter
+`.deb` and its checksums from
+[reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0)
+into `reporter-release`. Then:
 
 ```sh
 (cd root-release && sha256sum --ignore-missing -c SHA256SUMS)
-python3 -m venv .venv
-.venv/bin/pip install ./root-release/livingproof-*.whl
-.venv/bin/livingproof
-.venv/bin/livingproof capability --help
+(cd reporter-release && sha256sum --ignore-missing -c SHA256SUMS)
+sudo apt install ./root-release/livingproof_*_all.deb
+livingproof --help
+livingproof capability report --help  # explains that the plugin is not installed yet
+sudo apt install ./reporter-release/livingproof-capability-report_*_all.deb
+livingproof capability report --help
+livingproof-capability-report --help
 ```
 
-The root is useful without plugins. For reporting, download the wheel and checksums
-from [reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0)
-into a separate `reporter-release` directory, then install into **the same environment**:
+The root package is `Architecture: all`, contains pure Python and installed entry-point
+metadata, and uses distribution-owned Python and Click. The reporter is optional,
+not an apt dependency; install it explicitly. No pip installation into system Python
+or private Debian virtual environment is involved. Do not install only the reporter
+wheel into a separate virtual environment and expect `/usr/bin/livingproof` to discover it.
+Use `command -v livingproof` to check which executable your shell selected.
+
+Native CI tests **the same root Debian asset** with the published reporter `.deb`
+on Debian 12, Debian 13 and Ubuntu 24.04, on amd64 and arm64. Consult each release's
+`compatibility-amd64.json` / `compatibility-arm64.json` for actual outcomes rather
+than assuming a configured target passed. Unsupported distributions are unverified.
+
+### Python environment
 
 ```sh
-(cd reporter-release && sha256sum --ignore-missing -c SHA256SUMS)
+python3 -m venv .venv
+.venv/bin/pip install ./root-release/livingproof-*.whl
 .venv/bin/pip install ./reporter-release/livingproof_capability_report-*.whl
 .venv/bin/livingproof capability report --help
-.venv/bin/livingproof capability report validate bundle/manifest.json
-.venv/bin/livingproof capability report grade bundle/manifest.json -o report.json
-.venv/bin/livingproof capability report render report.json --format html -o report.html
 ```
 
-Use your portable evidence bundle or the reporter's
-[versioned fixture bundle](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.4.0/examples/bundle).
-The independently installed `livingproof-capability-report` command and Python
-library remain available; see the
+Use Python 3.11 or newer. Separate pipx environments cannot discover each other's
+plugins. The independently installed reporter command and Python library remain
+available; see the
 [reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.4.0/README.md).
 
-The umbrella never downloads evidence or installs plugins at runtime. Separate
-pipx environments cannot discover each other's plugins; install into one environment.
-Reporter versions before v1.4.0 continue to work standalone but have no plugin
-registration. Output files must be new; reporting errors and exit codes are
-preserved. Python installers resolve dependencies normally; source distributions
-are also provided. No system-wide pip installation is required.
+### Containers
+
+Two explicit variants are built from installed packages, with no source checkout,
+Task, runtime network dependency or automatic plugin installation:
+
+- `ghcr.io/living-proof-labs/livingproof:VERSION` contains the root command only.
+- `ghcr.io/living-proof-labs/livingproof:VERSION-reporting` contains root plus the
+  pinned reporter v1.4.0. Its standalone command and library remain installed.
+
+Use an explicit released version, never a moving `latest` tag. Native amd64/arm64
+images are also attached as `image-ARCH.tar` and `reporting-image-ARCH.tar`; saved
+images remain usable if registry publication or access is unavailable. Check the
+release workflow's registry checks for actual anonymous availability. Loading a
+saved image uses its architecture-specific tag:
+
+```sh
+VERSION=1.1.0  # replace with the selected release version
+ARCH=amd64    # use arm64 on ARM
+sha256sum --ignore-missing -c SHA256SUMS
+docker load -i "reporting-image-${ARCH}.tar"
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/bundle:/data:ro" \
+  "ghcr.io/living-proof-labs/livingproof:${VERSION}-reporting-${ARCH}" \
+  capability report validate manifest.json
+```
+
+The normal entrypoint is `livingproof`. A job container can override it with
+`--entrypoint /bin/sh`; CI checks normal and shell/interpreter entrypoint use
+separately. Root-only images give missing-plugin guidance. A reporting image's
+plugin lives in the same `/opt/livingproof` Python environment as the root.
+
+### Produce a report
+
+Use an existing portable evidence bundle. For a fixture demonstration, download
+the reporter v1.4.0 source archive and verify its published checksum, then extract
+only its example data (no source checkout or source execution is required):
+
+```sh
+tar -xzf reporter-release/livingproof_capability_report-1.4.0.tar.gz \
+  --strip-components=2 livingproof_capability_report-1.4.0/examples/bundle
+livingproof capability report validate bundle/manifest.json
+livingproof capability report grade bundle/manifest.json -o report.json
+livingproof capability report render report.json --format html -o report.html
+```
+
+Output files must be new. Reporting errors and exit codes are preserved. Fixture
+FAIL/INSUFFICIENT_EVIDENCE grades are expected evidence outcomes, not test-run failures.
 
 ### Shell completion
 
@@ -124,7 +187,7 @@ and other operating systems are not claimed as verified.
 
 Use [the contributor guide](docs/development.md) for Docker, devcontainer, Task,
 installed smoke tests and release handling. The pinned shared baseline is
-[collaboration-guidelines v3.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v3.0.0).
+[collaboration-guidelines v4.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v4.0.0).
 Read [the plugin contract](docs/plugins.md) before adding a plugin. Keep the root
 small and link versioned ecosystem documentation rather than copying it here.
 

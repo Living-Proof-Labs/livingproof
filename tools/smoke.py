@@ -92,6 +92,16 @@ def smoke():
         assert "capability" in run([source_bin / "livingproof", "--help"], work)
         assert run([command, "--version"], work) == run(
             [source_bin / "livingproof", "--version"], work)
+        if os.environ.get("SMOKE_RECORD"):
+            record = json.loads(run([python, "-c",
+                "import json,platform; from importlib.metadata import version; "
+                "print(json.dumps({'os':platform.freedesktop_os_release(), "
+                "'architecture':platform.machine(), 'python':platform.python_version(), "
+                "'versions':{name:version(name) for name in "
+                "('livingproof','livingproof-capability-report')}}))"], work))
+            record.update(outcome="PASS", execution="native", install_method="wheel-and-source",
+                          evidence=os.environ.get("COMPATIBILITY_EVIDENCE", "local execution"))
+            Path(os.environ["SMOKE_RECORD"]).write_text(json.dumps(record, indent=2) + "\n")
         print("PASS: root wheel/source, missing plugin, installed discovery and completion generation")
 
 

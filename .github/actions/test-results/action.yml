@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Publish individual test results
+description: Ingest JUnit cases into Checks and summaries, retaining failures and raw reports.
+inputs:
+  name:
+    required: true
+    description: Unique test check and artifact name
+  path:
+    required: true
+    description: JUnit report pattern
+runs:
+  using: composite
+  steps:
+    - name: Individual cases in run summary
+      if: ${{ !cancelled() }}
+      uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        reporter: python-xunit
+        use-actions-summary: 'true'
+        collapsed: never
+        fail-on-error: 'true'
+        fail-on-empty: 'true'
+    - name: Individual check and failure annotations
+      id: checks
+      if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        reporter: python-xunit
+        use-actions-summary: 'false'
+        collapsed: never
+        fail-on-error: 'true'
+        fail-on-empty: 'true'
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      id: raw
+      if: ${{ !cancelled() }}
+      with:
+        name: ${{ inputs.name }}-junit
+        path: ${{ inputs.path }}
+        if-no-files-found: error
+        retention-days: 14
+    - name: Evidence links and counts
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        CHECK_URL: ${{ steps.checks.outputs.url_html }}
+        REPORT_URL: ${{ steps.raw.outputs.artifact-url }}
+        PASSED: ${{ steps.checks.outputs.passed }}
+        FAILED: ${{ steps.checks.outputs.failed }}
+        SKIPPED: ${{ steps.checks.outputs.skipped }}
+      run: |
+        printf '\nIndividual results: [%s](%s) — passed %s, failed %s, skipped %s.\n' 'Check view' "$CHECK_URL" "$PASSED" "$FAILED" "$SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+        printf '\n[Raw JUnit reports](%s), retained for 14 days.\n' "$REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
+        if [ -z "$CHECK_URL" ]; then
+          echo 'Checks ingestion is unavailable for this fork/token; the summary and raw reports remain the available evidence.' >> "$GITHUB_STEP_SUMMARY"
+        fi
