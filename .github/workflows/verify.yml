@@ -8,77 +8,217 @@ permissions:
   contents: read
 jobs:
   verify:
+    permissions:
+      contents: read
+      checks: write
+    uses: ./.github/workflows/packages.yml
+    with:
+      version: '0.0.0'
+  development:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.12.23'
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
         with:
           version: '3.54.0'
-      - run: task dev:build
-      - run: task dev:verify
-      - name: Build and consume with the pinned published reporter
-        run: docker compose run --rm --user "$(id -u):$(id -g)" development bash -c 'task setup && task package && task integration'
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+      - run: npm install --prefix "$RUNNER_TEMP/devcontainer" @devcontainers/cli@0.89.0
+      - run: task setup
+      - run: task test:devcontainer
+        env:
+          DEVCONTAINER_CLI: ${{ runner.temp }}/devcontainer/node_modules/.bin/devcontainer
+      - uses: ./.github/actions/test-results
+        if: ${{ !cancelled() }}
         with:
-          name: candidate-package-and-tests
-          path: |
-            artifacts/tests.xml
-            dist/
-          if-no-files-found: error
+          name: devcontainer-tests
+          path: artifacts/devcontainer-tests.xml
   release:
-    needs: verify
+    needs: [verify, development]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
-    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v3.0.0
+    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v4.0.0
     with:
       draft-release: true
-  publish:
+  assets:
     needs: release
+    if: needs.release.outputs.draft-created == 'true'
+    permissions:
+      contents: read
+      checks: write
+    uses: ./.github/workflows/packages.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+  publish:
+    needs: [release, assets]
     if: needs.release.outputs.draft-created == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:
-      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.release.outputs.version }}
       RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+          name: packages-${{ needs.release.outputs.version }}-amd64
+          path: release-assets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          version: '3.54.0'
-      - run: task dev:build
-      - name: Assemble and verify the release candidate
-        run: docker compose run --rm --user "$(id -u):$(id -g)" -e SETUPTOOLS_SCM_PRETEND_VERSION development bash -c 'task setup && task package && task integration'
-      - name: Attach all assets before immutable publication
+          name: packages-${{ needs.release.outputs.version }}-arm64
+          path: arm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: consumed-${{ needs.release.outputs.version }}-amd64
+          path: release-assets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: consumed-${{ needs.release.outputs.version }}-arm64
+          path: release-assets
+      - name: Assemble checksums and all tested native images
+        run: |
+          cp arm/image-arm64.tar arm/reporting-image-arm64.tar release-assets/
+          cat release-assets/SHA256SUMS-amd64 release-assets/SHA256SUMS-arm64 > release-assets/SHA256SUMS
+          (cd release-assets && sha256sum -c SHA256SUMS)
+      - name: Attach all assets before publication
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+        run: gh release upload "$RELEASE_TAG" release-assets/*.whl release-assets/*.tar.gz release-assets/*.tar release-assets/*.deb release-assets/compatibility-*.json release-assets/compatibility-*.md release-assets/SHA256SUMS --repo "$GITHUB_REPOSITORY"
       - name: Publish the tested draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
-      - name: Verify anonymous downloads and clean installed consumption
-        run: |
-          mkdir downloaded
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-          version="${RELEASE_TAG#v}"
-          curl -fsSL "$base/SHA256SUMS" -o downloaded/SHA256SUMS
-          curl -fsSL "$base/livingproof-${version}-py3-none-any.whl" -o "downloaded/livingproof-${version}-py3-none-any.whl"
-          curl -fsSL "$base/livingproof-${version}.tar.gz" -o "downloaded/livingproof-${version}.tar.gz"
-          (cd downloaded && sha256sum -c SHA256SUMS)
-          docker compose run --rm --user "$(id -u):$(id -g)" -e LIVINGPROOF_DIST=/workspace/livingproof/downloaded development bash -c 'task setup && task smoke'
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+  consume-public:
+    needs: [release, publish]
+    if: needs.release.outputs.draft-created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      checks: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+      RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          name: release-assets
-          path: dist/
-          if-no-files-found: error
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.12.23'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - name: Download public assets anonymously
+        run: |
+          mkdir dist
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          for name in SHA256SUMS "livingproof-${VERSION}-py3-none-any.whl" "livingproof-${VERSION}.tar.gz" "livingproof_${VERSION}_all.deb" "image-${{ matrix.architecture }}.tar" "reporting-image-${{ matrix.architecture }}.tar"; do
+            curl --retry 3 -fsSL "$base/$name" -o "dist/$name"
+          done
+          (cd dist && sha256sum --ignore-missing -c SHA256SUMS)
+      - run: task setup
+      - run: uv run --locked --no-sync python tools/fetch_reporter.py --distributions
+      - run: task test:installed
+      - uses: ./.github/actions/test-results
+        if: ${{ !cancelled() }}
+        with:
+          name: public-consumer-tests-${{ matrix.architecture }}
+          path: artifacts/installed-tests.xml
+  registry:
+    needs: [release, consume-public]
+    if: needs.release.outputs.draft-created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: packages-${{ needs.release.outputs.version }}-${{ matrix.architecture }}
+          path: dist
+      - name: Publish exact saved images using existing workflow token
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker load -i "dist/image-${{ matrix.architecture }}.tar"
+          docker load -i "dist/reporting-image-${{ matrix.architecture }}.tar"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "ghcr.io/living-proof-labs/livingproof:$VERSION-${{ matrix.architecture }}"
+          docker push "ghcr.io/living-proof-labs/livingproof:$VERSION-reporting-${{ matrix.architecture }}"
+          docker logout ghcr.io
+  manifest:
+    needs: [release, registry]
+    if: needs.release.outputs.draft-created == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Publish versioned native manifests
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image=ghcr.io/living-proof-labs/livingproof
+          for suffix in '' '-reporting'; do
+            docker manifest create "$image:$VERSION$suffix" "$image:$VERSION$suffix-amd64" "$image:$VERSION$suffix-arm64"
+            docker manifest push "$image:$VERSION$suffix"
+          done
+          docker logout ghcr.io
+  registry-consumption:
+    needs: [release, manifest]
+    if: needs.release.outputs.draft-created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      checks: write
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.12.23'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - run: task setup
+      - run: uv run --locked --no-sync python tools/fetch_reporter.py
+      - run: uv run --locked --no-sync pytest tests/registry --junitxml=artifacts/registry-tests.xml
+      - uses: ./.github/actions/test-results
+        if: ${{ !cancelled() }}
+        with:
+          name: registry-tests-${{ matrix.runner }}
+          path: artifacts/registry-tests.xml

@@ -1,12 +1,21 @@
 {
   "name": "Living Proof Labs",
-  "build": {"dockerfile": "../Dockerfile", "context": "..", "target": "development"},
-  "workspaceFolder": "/workspace/livingproof",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/livingproof,type=bind",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "development"
+  },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
-  "postCreateCommand": "task setup",
+  "postCreateCommand": "task setup && livingproof --help",
   "customizations": {
-    "vscode": {"extensions": ["ms-python.python"], "settings": {"python.defaultInterpreterPath": "/tmp/livingproof-venv/bin/python"}}
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/livingproof-dev/venv/bin/python"
+      }
+    }
   }
 }

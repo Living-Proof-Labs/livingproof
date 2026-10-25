@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:0.12.23 AS uv-tools
 FROM python-base AS development
 COPY --from=uv-tools /uv /uvx /usr/local/bin/
 ARG TASK_VERSION=3.54.0
-RUN apt-get update && apt-get install -y --no-install-recommends bash ca-certificates curl git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends bash ca-certificates curl git dpkg-dev && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=secret,id=ca,required=false set -eu; \
     if [ -f /run/secrets/ca ]; then export CURL_CA_BUNDLE=/run/secrets/ca; fi; \
     arch="$(dpkg --print-architecture)"; \
@@ -19,7 +19,26 @@ RUN --mount=type=secret,id=ca,required=false set -eu; \
     tar -xzf "task_linux_${arch}.tar.gz" task; \
     install task /usr/local/bin/task; rm -rf /tmp/task
 RUN useradd --create-home --uid 1000 --shell /bin/bash vscode
-ENV UV_PROJECT_ENVIRONMENT=/tmp/livingproof-venv UV_CACHE_DIR=/tmp/livingproof-uv-cache
+RUN mkdir -p /opt/livingproof-dev && chmod 1777 /opt/livingproof-dev
+ENV UV_PROJECT_ENVIRONMENT=/opt/livingproof-dev/venv UV_CACHE_DIR=/tmp/livingproof-uv-cache
+ENV PATH="/opt/livingproof-dev/venv/bin:${PATH}"
 WORKDIR /workspace/livingproof
 USER vscode
 CMD ["sleep", "infinity"]
+
+FROM python-base AS runtime
+ARG VERSION
+LABEL org.opencontainers.image.source="https://github.com/Living-Proof-Labs/livingproof"
+LABEL org.opencontainers.image.version="${VERSION}"
+COPY dist/wheels/ /tmp/wheels/
+RUN python -m venv /opt/livingproof && /opt/livingproof/bin/pip install --no-index --find-links=/tmp/wheels "livingproof==${VERSION}" && rm -rf /tmp/wheels
+ENV PATH="/opt/livingproof/bin:${PATH}"
+WORKDIR /data
+ENTRYPOINT ["livingproof"]
+CMD ["--help"]
+
+FROM runtime AS reporting
+ARG REPORTER_VERSION
+LABEL io.livingproof.reporter.version="${REPORTER_VERSION}"
+COPY dist/wheels/ /tmp/wheels/
+RUN /opt/livingproof/bin/pip install --no-index --find-links=/tmp/wheels "livingproof-capability-report==${REPORTER_VERSION}" && rm -rf /tmp/wheels

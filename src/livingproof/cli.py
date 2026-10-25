@@ -8,7 +8,8 @@ import click
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
     "Install the livingproof-capability-report v1.4.0 wheel into the same Python environment "
-    "as livingproof. Download it and verify SHA256SUMS from https://github.com/"
+    "as livingproof. For a Debian-installed root, install the reporter all.deb with apt instead. "
+    "Download it and verify SHA256SUMS from https://github.com/"
     "Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0. "
     "No packages are installed automatically."
 )

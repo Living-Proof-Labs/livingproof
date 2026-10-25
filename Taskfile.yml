@@ -6,7 +6,7 @@ tasks:
   setup:
     desc: Sync locked dependencies into the project environment
     cmds:
-      - uv sync --locked --no-python-downloads
+      - uv sync --locked --inexact --no-python-downloads
   check:
     desc: Check Python with locked Ruff
     cmds:
@@ -21,9 +21,10 @@ tasks:
       - task: check
       - task: test
   package:
-    desc: Build wheel and source distribution
+    desc: Build wheel, source and portable Debian package
     cmds:
       - uv build --no-sources
+      - uv run --locked --no-sync python tools/debian.py
       - uv run --locked --no-sync python tools/checksums.py
   smoke:
     desc: Check clean installed wheel consumption
@@ -50,3 +51,20 @@ tasks:
     cmds:
       - uv run --locked --no-sync python tools/fetch_reporter.py
       - task: smoke
+  plugin:install:
+    desc: Explicitly install the pinned reporter into the development Python environment
+    cmds:
+      - uv run --locked --no-sync python tools/fetch_reporter.py
+      - uv run --locked --no-sync python tools/install_plugin.py
+  images:
+    desc: Build native root and reporting images from verified wheels
+    cmds:
+      - uv run --locked --no-sync python tools/distributions.py
+  test:installed:
+    desc: Test real installed distributions and emit individual JUnit results
+    cmds:
+      - uv run --locked --no-sync pytest tests/installed --junitxml=artifacts/installed-tests.xml
+  test:devcontainer:
+    desc: Exercise the actual devcontainer lifecycle and emit JUnit results
+    cmds:
+      - uv run --locked --no-sync pytest tests/lifecycle --junitxml=artifacts/devcontainer-tests.xml

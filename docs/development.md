@@ -1,53 +1,114 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-# Development and delivery
+# Development and installed-consumer verification
 
-The Docker `development` target supplies Python 3.12, uv 0.12.23 and Task 3.54.0.
-The devcontainer and GitHub CI reuse it. Dependency setup uses committed `uv.lock`.
-No nested Docker or paid Codespace is required. On a Linux Docker/Compose host:
+The Docker development target supplies Python 3.12, uv 0.12.23, Task 3.54.0 and
+native Debian tooling. The devcontainer and CI reuse it; project dependencies
+come from committed `uv.lock`. No paid Codespace, nested Docker or mounted Docker
+socket is needed to edit, test or run the CLI inside the development container.
+
+## Start a development environment
+
+Open the repository in its devcontainer. The standard workspace mount is used,
+matching Codespaces' `/workspaces` layout. `postCreateCommand` runs `task setup`
+and `livingproof --help`. The development environment is on PATH, so the command
+works directly in an interactive terminal. It is separate from system Python.
 
 ```sh
-task dev:build
-task dev:verify
+livingproof --help
+task verify
+livingproof capability report --help  # useful missing-plugin guidance
 ```
 
-In the prepared environment or devcontainer:
+Reporter installation is an explicit opt-in:
+
+```sh
+task plugin:install
+livingproof capability report --help
+livingproof capability report validate artifacts/reporter/source/examples/bundle/manifest.json
+```
+
+This contributor task downloads and checksum-verifies reporter v1.4.0, then
+installs its wheel into the same development environment. It never runs implicitly
+when the CLI starts. `task setup` locks root/tool dependencies while retaining
+explicitly installed plugins (`uv sync --inexact`); rebuilding a fresh container
+requires opting into the plugin again. These are development instructions;
+Debian consumers install both `.deb` files with apt as described in the README.
+
+Completion is optional. Generate and source the Bash script explicitly:
+
+```sh
+_LIVINGPROOF_COMPLETE=bash_source livingproof > /tmp/livingproof-completion.bash
+. /tmp/livingproof-completion.bash
+```
+
+The previous v1.0.0 configuration installed into `/tmp/livingproof-venv` without
+adding its bin directory to PATH. The current configuration uses a dedicated
+`/opt/livingproof-dev/venv` on PATH and verifies direct command access in the
+lifecycle. No browser screenshot by itself establishes a container build failure;
+inspect the actual creation log and `command -v livingproof` when diagnosing startup.
+
+## Common commands
+
+On a Linux Docker/Compose host, `task dev:build` and `task dev:verify` use the same
+Docker target. Inside a prepared environment use `task setup` and `task verify`
+directly. Unit tests collect only `tests/unit`, never tests in downloaded plugin sources.
+
+`task package` builds wheel/source and an `Architecture: all` Debian package using
+PyPA installer and native `dpkg-deb`; no custom wheel installer or vendored virtual
+environment is shipped. `task images` is a host/CI command requiring Docker: it
+reuses the reporter's checksum-verified, versioned native wheelhouse to build
+root-only and reporting variants without network access during image installation.
+Version selection comes from Git tags or `SETUPTOOLS_SCM_PRETEND_VERSION` in release CI.
 
 ```sh
 task setup
 task verify
 task package
-task smoke
+task images
+task test:installed
 ```
 
-Task's Python commands are adapted from the Apache-2.0
-[shared v3.0.0 template](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v3.0.0/templates/python/Taskfile.yml).
-A host may provide Python, uv and Task directly for the same tasks. Builds derive
-versions from Git tags through hatch-vcs; untagged candidate builds use development versions, not release tags.
-Consumers need only the wheel and dependencies, never Task or the source checkout.
+The installed suite exercises native distribution containers with only package
+assets, fixture data and a test harness mounted. Application checkouts are absent.
+It tests root-alone guidance, explicit reporter installation, policy grades,
+terminal/JSON/HTML/CSV parity, errors, completion, uninstall independence and
+package metadata. CI repeats consumption using the **same amd64-built all.deb**
+on both native CPU architectures, then repeats against public release downloads.
 
-`task smoke` installs the built wheel into a disposable virtual environment outside
-the checkout, tests missing-plugin guidance, then installs a real fixture plugin
-wheel to test metadata discovery. Set `REPORTER_WHEEL` and `REPORTER_BUNDLE` to a
-plugin-enabled reporter wheel and portable fixture bundle to additionally validate,
-grade and render with both installed commands and compare their output. This is
-the required cross-repository consumption check before delivery; fixtures alone
-are not proof that the real reporter integration works.
+## Actual devcontainer lifecycle
 
-Open focused draft PRs first. Run hosted checks before routine tested merges.
-CI runs the same development image and Task commands. `task integration` downloads
-the exact reporter tag in `reporter-release.txt`, verifies its published wheel
-checksum, obtains that tag's example bundle and runs clean installed consumption.
-These downloads are development/release tooling, never runtime CLI behavior.
-Update the pin deliberately through a PR after verifying the upstream release.
+Install the reference `@devcontainers/cli@0.89.0` in the host tool environment, then:
 
-The shared semantic-release workflow at v3.0.0 runs after main verification and
-creates a draft. A dependent job builds wheel/source assets using the returned
-version, reruns installed consumption, attaches all assets and SHA256SUMS, then
-publishes. Finally it anonymously downloads the public assets, verifies their
-checksums and repeats installed consumption. Generated notes live on GitHub Releases;
-do not commit generated version bumps or changelogs. No PyPI/container registry
-publication or settings change is included. See [release operation](../.github/RELEASE.md).
+```sh
+task test:devcontainer
+```
 
-Configured CI targets Linux; hosted checks and release asset consumption are
-separate evidence from local checks. Other operating systems and live
-editor/devcontainer launches remain unverified until exercised.
+The test calls `devcontainer up`, runs the configured creation hook, executes
+interactive commands, opts into the reporter, produces a report, restarts the
+container and checks commands/completion again. It removes its own test container.
+This verifies the actual configuration lifecycle, not a live browser editor session.
+Host proxy/CA overrides, if needed locally, stay outside the committed config.
+`DEVCONTAINER_CONFIG` selects such a local override; it must not change project
+commands or silently skip lifecycle hooks. No paid Codespaces are started by CI.
+
+## Visible CI results and release evidence
+
+`pytest` emits individual JUnit cases for unit, installed-package, devcontainer
+and registry suites. The pinned report publisher parses them into GitHub Checks
+with expanded cases/failure annotations and into the run summary. Summaries link
+to check views and raw reports, retained for 14 days. Report publication/upload
+is attempted after failure; failing tests retain their nonzero exit status and
+block release. Missing/malformed reports and publisher failures are errors.
+Forks retain summaries/artifacts; a read-only fork token cannot publish Checks.
+
+A deliberate test-only failure is used during adoption to verify that a failed
+case and the failing workflow remain visible; its historical run is linked in
+the PR. It is removed before the green merge. Historical trend dashboards are not
+claimed. Compatibility JSON/Markdown is generated from actual runtime probes;
+missing probes are NOT_COMPLETED and failed cases remain FAIL.
+
+The shared baseline and release engine are pinned to
+[collaboration-guidelines v4.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v4.0.0).
+The host orchestration suite uses the same locked Python tools because it must
+control native Docker; app setup/tests/builds also run in the shared development
+image. Release details are in [release operation](../.github/RELEASE.md).

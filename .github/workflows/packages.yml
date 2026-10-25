@@ -1,0 +1,118 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Native packages and installed consumers
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.12.23'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - run: task setup
+      - run: task dev:build
+      - run: task dev:verify
+      - name: Build wheel, source and Debian in the shared development image
+        run: docker compose run --rm --user "$(id -u):$(id -g)" -e SETUPTOOLS_SCM_PRETEND_VERSION development bash -c 'task setup && task package'
+      - run: task images
+      - run: task test:installed
+      - name: Generate actual compatibility evidence
+        if: ${{ !cancelled() }}
+        run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/test-results
+        if: ${{ !cancelled() }}
+        with:
+          name: package-tests-${{ inputs.version }}-${{ matrix.architecture }}
+          path: artifacts/*tests.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() && hashFiles('dist/**') != '' }}
+        with:
+          name: packages-${{ inputs.version }}-${{ matrix.architecture }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+  consume:
+    needs: build
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.12.23'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: packages-${{ inputs.version }}-${{ matrix.architecture }}
+          path: dist
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: packages-${{ inputs.version }}-amd64
+          path: common
+      - name: Use the exact same candidate all.deb on both native architectures
+        run: |
+          (cd common && sha256sum --ignore-missing -c SHA256SUMS-amd64)
+          cp common/livingproof_*_all.deb dist/
+      - run: task setup
+      - run: uv run --locked --no-sync python tools/fetch_reporter.py --distributions
+      - run: task test:installed
+      - name: Generate consumer evidence for the common Debian asset
+        if: ${{ !cancelled() }}
+        run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/test-results
+        if: ${{ !cancelled() }}
+        with:
+          name: consumer-tests-${{ inputs.version }}-${{ matrix.architecture }}
+          path: artifacts/installed-tests.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: consumed-${{ inputs.version }}-${{ matrix.architecture }}
+          path: |
+            dist/compatibility-*.json
+            dist/compatibility-*.md
+            dist/SHA256SUMS-*
+          if-no-files-found: error
+          retention-days: 14
