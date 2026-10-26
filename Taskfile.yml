@@ -23,6 +23,7 @@ tasks:
   package:
     desc: Build wheel, source and portable Debian package
     cmds:
+      - uv run --locked --no-sync python tools/fetch_common.py
       - uv build --no-sources
       - uv run --locked --no-sync python tools/debian.py
       - uv run --locked --no-sync python tools/checksums.py

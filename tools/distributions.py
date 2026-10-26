@@ -19,6 +19,8 @@ def build():
     with tarfile.open(ROOT / f"artifacts/reporter/wheelhouse-{ARCH}.tar.gz") as archive:
         archive.extractall(ROOT / "dist", filter="data")
     shutil.copyfile(wheel, ROOT / "dist/wheels" / wheel.name)
+    common = ROOT / "dist/livingproof_common-1.0.0-py3-none-any.whl"
+    shutil.copyfile(common, ROOT / "dist/wheels" / common.name)
     extra = []
     if os.environ.get("PACKAGE_NETWORK"):
         extra += ["--network", os.environ["PACKAGE_NETWORK"]]

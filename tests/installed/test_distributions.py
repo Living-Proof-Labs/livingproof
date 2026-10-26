@@ -70,7 +70,7 @@ def test_saved_container(variant, mode):
 @pytest.mark.parametrize("distribution", ["debian:12-slim", "debian:13-slim", "ubuntu:24.04"])
 def test_debian_plugins(distribution):
     # Only package assets, fixture data and this probe are mounted, never app source.
-    command = ("set -eu; apt-get update -qq; apt-get install -y /packages/livingproof_*_all.deb; "
+    command = ("set -eu; apt-get update -qq; apt-get install -y /packages/livingproof_*_all.deb /packages/python3-livingproof-common_*_all.deb; "
                "cd /tmp; /usr/bin/python3 /probe.py debian /results/"
                + distribution.replace(":", "-") + ".json --reporter-deb "
                "/reporter.deb")
@@ -99,7 +99,7 @@ def test_portable_debian_metadata():
 def test_bash_completion_lifecycle(distribution):
     command = (
         "set -eu; apt-get update -qq; "
-        "apt-get install -y bash-completion /packages/livingproof_*_all.deb; "
+        "apt-get install -y bash-completion /packages/livingproof_*_all.deb /packages/python3-livingproof-common_*_all.deb; "
         "dpkg-query -S /usr/share/bash-completion/completions/livingproof; "
         "python3 /completion_probe.py absent; "
         "apt-get install -y /reporter.deb; "

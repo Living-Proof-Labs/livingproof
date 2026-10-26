@@ -39,7 +39,10 @@ def probe(released=False):
         # A normal shell exists BEFORE apt installs the application. No --norc,
         # test rcfile, or explicit source of the completion framework is used.
         with BashSession(work) as shell:
-            shell.run("apt-get install -y --no-install-recommends /packages/livingproof_*_all.deb")
+            packages = "/packages/livingproof_*_all.deb"
+            if not released:
+                packages += " /packages/python3-livingproof-common_*_all.deb"
+            shell.run("apt-get install -y --no-install-recommends " + packages)
             shell.run("test ! -f /usr/share/bash-completion/bash_completion")
             expect(shell, "livingproof cap", "livingproof cap-filesystem-fallback ")
             if not released:

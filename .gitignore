@@ -5,3 +5,5 @@ __pycache__/
 dist/
 artifacts/
 downloaded/
+
+src/livingproof/_build_provenance.json
