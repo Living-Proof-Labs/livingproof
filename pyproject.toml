@@ -15,6 +15,9 @@ dependencies = ["click>=8.1,<9"]
 [project.scripts]
 livingproof = "livingproof.cli:main"
 
+[tool.hatch.build.targets.wheel.shared-data]
+"completions/livingproof" = "share/bash-completion/completions/livingproof"
+
 [tool.hatch.version]
 source = "vcs"
 [tool.hatch.version.raw-options]

@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: Apache-2.0
+# Load the installed Click version's adapter on demand, without a command inventory.
+eval "$(_LIVINGPROOF_COMPLETE=bash_source livingproof)"
