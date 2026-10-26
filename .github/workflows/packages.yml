@@ -68,7 +68,7 @@ jobs:
         if: ${{ !cancelled() && steps.documentation.outputs.artifact-url != '' }}
         env:
           DOCS_URL: ${{ steps.documentation.outputs.artifact-url }}
-        run: echo "[Generated documentation and scenario evidence]($DOCS_URL) — download, extract and open html/index.html (14-day retention)." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "[Generated documentation and scenario evidence]($DOCS_URL) — download, extract and open docs/html/index.html (14-day retention)." >> "$GITHUB_STEP_SUMMARY"
       - name: Generate actual compatibility evidence
         if: ${{ !cancelled() }}
         run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"

@@ -54,7 +54,7 @@ commands, exits and output. A second summary table maps each scenario to its tes
 and status. Test failures remain failing job steps; documentation/report generation
 is attempted after failure and cannot turn them green.
 
-`documentation-VERSION-ARCHITECTURE` contains `html/index.html` and the feature
+`documentation-VERSION-ARCHITECTURE` contains `docs/html/index.html` and the feature
 JSON/Markdown map. Download and extract it, then open the HTML index. CI links the
 artifact in the run summary; retention is 14 days, matching test evidence.
 This is a browsable offline artifact, not an enabled Pages site. No hosting,
