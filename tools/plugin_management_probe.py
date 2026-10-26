@@ -30,7 +30,7 @@ def main(mode):
     assert ('system Debian' if mode == 'deb' else 'Python environment') in plan
     run('livingproof', 'plugins', 'status', NAME, expected=1, env=offline)
     if mode == 'deb':
-        denied = run('runuser', '-u', 'nobody', '--', 'livingproof', 'plugins', 'install',
+        denied = run('runuser', '--preserve-environment', '-u', 'nobody', '--', 'livingproof', 'plugins', 'install',
                      NAME, '--version', '1.6.0', expected=1)
         assert 'Administrator privileges required' in denied
     # Historical pin then upgrade exercises package-manager downgrade/upgrade selection.
@@ -54,6 +54,8 @@ def main(mode):
     # Repeating the default release must preserve discovery and common dependency.
     run('livingproof', 'plugins', 'install', NAME)
     run('livingproof', 'plugins', 'status', NAME, env=offline)
+    run('livingproof', 'plugins', 'install', NAME, '--version', '1.4.0')
+    assert '1.4.0' in run('livingproof', 'plugins', 'status', NAME, env=offline)
     if mode == 'deb':
         run('apt-get', 'remove', '-y', NAME)
     else:

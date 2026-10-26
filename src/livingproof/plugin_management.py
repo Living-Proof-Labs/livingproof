@@ -35,9 +35,14 @@ def fail(message):
 
 
 def request(url):
+    headers = {'User-Agent': 'livingproof-plugin-manager',
+               'Accept': 'application/vnd.github+json'}
+    # Optional existing CI token is scoped to the API host, never release downloads.
+    token = os.environ.get('LIVINGPROOF_GITHUB_TOKEN')
+    if token and urlparse(url).netloc == 'api.github.com':
+        headers['Authorization'] = 'Bearer ' + token
     try:
-        with urlopen(Request(url, headers={'User-Agent': 'livingproof-plugin-manager',
-                                          'Accept': 'application/vnd.github+json'}),
+        with urlopen(Request(url, headers=headers),
                      timeout=30) as response:
             data = response.read(128 * 1024 * 1024 + 1)
             if len(data) > 128 * 1024 * 1024:
@@ -260,7 +265,9 @@ def install(name, version, dry_run=False):
         else:
             run([sys.executable, '-m', 'pip', '--version'])
         try:
-            subprocess.run(command, check=True, stdin=subprocess.DEVNULL)
+            subprocess.run(command, check=True, stdin=subprocess.DEVNULL,
+                           env={**os.environ, **({"DEBIAN_FRONTEND": "noninteractive"}
+                                               if mode == "deb" else {})})
         except (OSError, subprocess.CalledProcessError) as exc:
             fail(f'Package installation failed: {exc}. Package manager may have made partial '
                  'changes; inspect livingproof plugins status and retry the explicit install.')

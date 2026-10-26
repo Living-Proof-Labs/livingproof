@@ -39,7 +39,7 @@ def docker():
         args += ["--network", os.environ["PACKAGE_NETWORK"]]
     if os.environ.get("PACKAGE_PROXY_HOST"):
         args += ["--add-host", os.environ["PACKAGE_PROXY_HOST"]]
-    for name in ("http_proxy", "https_proxy"):
+    for name in ("http_proxy", "https_proxy", "LIVINGPROOF_GITHUB_TOKEN"):
         if name in os.environ:
             args += ["-e", name]
     if os.environ.get("PACKAGE_CA_BUNDLE"):
@@ -135,5 +135,6 @@ def test_explicit_plugin_management(distribution, mode):
                  "python3 -m venv /opt/test; "
                  "/opt/test/bin/pip install --no-index --find-links=/packages/wheels livingproof; "
                  "PATH=/opt/test/bin:$PATH /opt/test/bin/python /management_probe.py wheel")
-    run([*docker(), "-v", f"{ROOT}/tools/plugin_management_probe.py:/management_probe.py:ro",
+    run([*docker(), "-e", "DEBIAN_FRONTEND=noninteractive",
+         "-v", f"{ROOT}/tools/plugin_management_probe.py:/management_probe.py:ro",
          distribution, "sh", "-c", "set -eu; apt-get update -qq; " + setup])

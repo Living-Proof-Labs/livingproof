@@ -173,3 +173,17 @@ def test_externally_managed_context(monkeypatch, tmp_path):
     (tmp_path / 'EXTERNALLY-MANAGED').unlink()
     with pytest.raises(Exception, match='Unsupported root installation context'):
         pm.context()
+
+
+def test_optional_api_token_never_sent_to_assets(monkeypatch):
+    from io import BytesIO
+    headers = []
+    monkeypatch.setenv('LIVINGPROOF_GITHUB_TOKEN', 'test-only-token')
+    def opened(req, timeout):
+        headers.append(dict(req.header_items()))
+        return BytesIO(b'{}')
+    monkeypatch.setattr(pm, 'urlopen', opened)
+    pm.request('https://api.github.com/repos/Living-Proof-Labs/livingproof/releases')
+    pm.request('https://github.com/Living-Proof-Labs/livingproof/releases/download/v1/SHA256SUMS')
+    assert headers[0]['Authorization'] == 'Bearer test-only-token'
+    assert 'Authorization' not in headers[1]

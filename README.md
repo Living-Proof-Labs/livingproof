@@ -316,7 +316,10 @@ PEP 668 override. Create a virtual environment with `python3 -m venv ENV` and
 install the root wheel there, then invoke `ENV/bin/livingproof`. That environment
 must include pip. Normal Python dependencies use pip's configured package index;
 Debian dependencies use the administrator's configured distribution repositories.
-No repository configuration or credentials are changed.
+No repository configuration or credentials are changed. Anonymous API access needs
+no credentials. Automated test environments may supply an existing read-only
+`LIVINGPROOF_GITHUB_TOKEN` to avoid the anonymous API rate limit; it is sent only
+to api.github.com, never to release download hosts.
 
 The explicit install command prints all verified artifacts, target and operation
 before mutation, never prompts, never invokes sudo and never handles passwords.
