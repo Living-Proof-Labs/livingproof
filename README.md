@@ -339,3 +339,12 @@ Debian reporter with `apt-get remove livingproof-capability-report`, or a virtua
 environment reporter with `ENV/bin/python -m pip uninstall livingproof-capability-report`.
 Keep common while root still requires it. Restart the command after installation;
 plugin discovery and completion use the newly installed entry point.
+
+## Executable user journeys and browsable documentation
+
+See the [verification and documentation guide](docs/verification.md) for the small
+[installed-user scenario pilot](tests/features/installed.feature), generated Click
+reference, actual scenario outcomes and independent-review commands. Run `task docs`
+after building and exercising the candidate images to browse
+`artifacts/docs/html/index.html`, or download the linked documentation artifact from
+[the CI run](https://github.com/Living-Proof-Labs/livingproof/actions/workflows/verify.yml).

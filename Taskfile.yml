@@ -69,3 +69,15 @@ tasks:
     desc: Exercise the actual devcontainer lifecycle and emit JUnit results
     cmds:
       - uv run --locked --no-sync pytest tests/lifecycle --junitxml=artifacts/devcontainer-tests.xml
+  test:features:
+    desc: Run executable installed-user scenarios in fresh offline containers
+    cmds:
+      - uv run --locked --no-sync pytest tests/features --junitxml=artifacts/feature-tests.xml
+  features:results:
+    desc: Map scenario coverage to actual JUnit outcomes (missing results fail)
+    cmds:
+      - uv run --locked --no-sync python tools/feature_results.py
+  docs:
+    desc: Build browsable Click and scenario docs from packaged images and current results
+    cmds:
+      - uv run --locked --no-sync python tools/docs.py

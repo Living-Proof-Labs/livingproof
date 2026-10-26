@@ -112,3 +112,7 @@ The shared baseline and release engine are pinned to
 The host orchestration suite uses the same locked Python tools because it must
 control native Docker; app setup/tests/builds also run in the shared development
 image. Release details are in [release operation](../.github/RELEASE.md).
+
+The [installed-user pilot and generated documentation](verification.md) adds
+executable feature scenarios and a browsable command/scenario reference alongside
+these existing regression suites. Its scope and untested areas are explicit.
