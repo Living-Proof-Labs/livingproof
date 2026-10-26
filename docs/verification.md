@@ -49,9 +49,9 @@ Malformed, duplicate and unexpected results fail generation.
 The existing native package build job runs the scenarios on amd64 and arm64 after
 building its candidate artifacts. Existing regression jobs remain. Its existing
 JUnit publisher ingests `artifacts/feature-tests.xml` alongside the unit and
-installed reports into expanded checks and job summaries, including captured
-commands, exits and output. A second summary table maps each scenario to its test
-and status. Test failures remain failing job steps; documentation/report generation
+installed reports into expanded checks and job summaries with named cases and
+failure details. Raw JUnit retains captured commands, exits and output. A second
+summary table maps each scenario to its test and status. Test failures remain failing job steps; documentation/report generation
 is attempted after failure and cannot turn them green.
 
 `documentation-VERSION-ARCHITECTURE` contains `docs/html/index.html` and the feature
