@@ -43,6 +43,8 @@ jobs:
         run: docker compose run --rm --user "$(id -u):$(id -g)" -e SETUPTOOLS_SCM_PRETEND_VERSION development bash -c 'task setup && task package'
       - run: task images
       - run: task test:installed
+        env:
+          LIVINGPROOF_GITHUB_TOKEN: ${{ github.token }}
       - name: Generate actual compatibility evidence
         if: ${{ !cancelled() }}
         run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"
@@ -98,6 +100,8 @@ jobs:
       - run: task setup
       - run: uv run --locked --no-sync python tools/fetch_reporter.py --distributions
       - run: task test:installed
+        env:
+          LIVINGPROOF_GITHUB_TOKEN: ${{ github.token }}
       - name: Generate consumer evidence for the common Debian asset
         if: ${{ !cancelled() }}
         run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"

@@ -282,3 +282,60 @@ unchanged upstream common wheel and Debian library after checking their publishe
 SHA-256 digests. Offline container installs resolve it from the wheelhouse. Install
 the common `.deb` alongside root's `.deb`; no apt repository or PyPI availability
 is assumed. Runtime commands never download or install dependencies.
+
+## Explicit plugin management
+
+```sh
+livingproof plugins versions livingproof-capability-report
+livingproof plugins versions livingproof-capability-report --limit 120
+livingproof plugins install livingproof-capability-report --version 1.6.0 --dry-run
+livingproof plugins install livingproof-capability-report --version 1.6.0
+livingproof plugins status livingproof-capability-report
+```
+
+Installation defaults to GitHub's latest published stable release. Version lists
+include prereleases and release titles, default to 20 entries, and automatically
+page for larger limits. A pin selects an exact published `vVERSION` tag and can
+upgrade or downgrade. Repeating an install reconciles the requested packages.
+Existing root and reporter `--version` options still print build identity.
+
+Only the known reporter is accepted. Assets come from the release API for
+`Living-Proof-Labs/livingproof-capability-report`; its declared exact common
+library dependency comes from `Living-Proof-Labs/livingproof-common`. Every
+selected artifact must have one matching published `SHA256SUMS` entry. Checksums
+protect integrity against the trusted release record, not a compromised publisher.
+The manager checks package identity, version, wheel/Python compatibility or Debian
+architecture before installation. An incompatible root/common requirement fails
+before package mutation. Common is supplied even when already installed, so apt
+does not need a Living Proof Labs package repository.
+
+A root owned by the installed `livingproof` Debian package uses apt. A root in a
+virtual environment uses that interpreter's pip, including on Debian. Other
+contexts fail with migration instructions; there is no system pip fallback or
+PEP 668 override. Create a virtual environment with `python3 -m venv ENV` and
+install the root wheel there, then invoke `ENV/bin/livingproof`. That environment
+must include pip. Normal Python dependencies use pip's configured package index;
+Debian dependencies use the administrator's configured distribution repositories.
+No repository configuration or credentials are changed. Anonymous API access needs
+no credentials. Automated test environments may supply an existing read-only
+`LIVINGPROOF_GITHUB_TOKEN` to avoid the anonymous API rate limit; it is sent only
+to api.github.com, never to release download hosts.
+
+The explicit install command prints all verified artifacts, target and operation
+before mutation, never prompts, never invokes sudo and never handles passwords.
+The Debian operation repairs missing dependencies using the supplied artifacts and
+refuses package removals. For a system install an administrator must explicitly run the command from the
+Debian installation with appropriate privileges. `--dry-run` downloads and verifies
+but does not install. Ordinary commands, help and completion never install or
+fetch anything. `status` reads local metadata and checks that the discovered plugin
+loads; it reports the actual package version, not a release lookup.
+
+Exit codes are 0 for success, 1 for absent/broken plugins or operational failures,
+and 2 for invalid arguments. Network failures, rate limits, unavailable assets and
+checksum failures abort before installation. Temporary downloads are removed.
+Package-manager failures can leave partial dependency changes: inspect `plugins
+status`, fix the reported package-manager problem, and explicitly retry. Remove a
+Debian reporter with `apt-get remove livingproof-capability-report`, or a virtual
+environment reporter with `ENV/bin/python -m pip uninstall livingproof-capability-report`.
+Keep common while root still requires it. Restart the command after installation;
+plugin discovery and completion use the newly installed entry point.

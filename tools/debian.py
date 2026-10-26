@@ -34,7 +34,7 @@ Version: {version}
 Section: python
 Priority: optional
 Architecture: all
-Depends: python3-livingproof-common (= 1.0.0), python3 (>= 3.11), python3-click (>= 8.1)
+Depends: python3-livingproof-common (= 1.0.0), python3 (>= 3.11), python3-click (>= 8.1), python3-packaging (>= 23)
 Recommends: bash-completion
 Suggests: livingproof-capability-report (>= 1.4.0)
 Maintainer: Living Proof Labs <rivet@rollerbot.ai>

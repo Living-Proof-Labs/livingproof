@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Build two native container variants from verified installed-package inputs."""
+import hashlib
+import tomllib
+from urllib.request import urlopen
 import os
 import platform
 import shutil
@@ -21,6 +24,15 @@ def build():
     shutil.copyfile(wheel, ROOT / "dist/wheels" / wheel.name)
     common = ROOT / "dist/livingproof_common-1.0.0-py3-none-any.whl"
     shutil.copyfile(common, ROOT / "dist/wheels" / common.name)
+    # Root runtime dependency, independent of the reporter's wheelhouse.
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    package, = [p for p in lock['package'] if p['name'] == 'packaging']
+    asset, = package['wheels']
+    with urlopen(asset['url'], timeout=60) as response:
+        content = response.read()
+    if 'sha256:' + hashlib.sha256(content).hexdigest() != asset['hash']:
+        raise ValueError('Locked packaging wheel checksum mismatch')
+    (ROOT / 'dist/wheels' / asset['url'].rsplit('/', 1)[1]).write_bytes(content)
     extra = []
     if os.environ.get("PACKAGE_NETWORK"):
         extra += ["--network", os.environ["PACKAGE_NETWORK"]]

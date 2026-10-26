@@ -39,7 +39,7 @@ def docker():
         args += ["--network", os.environ["PACKAGE_NETWORK"]]
     if os.environ.get("PACKAGE_PROXY_HOST"):
         args += ["--add-host", os.environ["PACKAGE_PROXY_HOST"]]
-    for name in ("http_proxy", "https_proxy"):
+    for name in ("http_proxy", "https_proxy", "LIVINGPROOF_GITHUB_TOKEN"):
         if name in os.environ:
             args += ["-e", name]
     if os.environ.get("PACKAGE_CA_BUNDLE"):
@@ -121,3 +121,21 @@ def test_default_bash_startup_and_cli_recovery(distribution):
     command = ("apt-get update -qq && apt-get install -y --no-install-recommends python3 "
                "&& python3 /tools/completion_startup_probe.py")
     run([*docker(), "-v", f"{ROOT}/tools:/tools:ro", distribution, "sh", "-c", command])
+
+
+@pytest.mark.parametrize("distribution", ["debian:12-slim", "debian:13-slim", "ubuntu:24.04"])
+@pytest.mark.parametrize("mode", ["deb", "wheel"])
+def test_explicit_plugin_management(distribution, mode):
+    if mode == "deb":
+        setup = ("apt-get install -y ca-certificates /packages/livingproof_*_all.deb "
+                 "/packages/python3-livingproof-common_*_all.deb; "
+                 "python3 /management_probe.py deb")
+    else:
+        setup = ("apt-get install -y ca-certificates python3-venv; "
+                 "python3 -m venv /opt/test; "
+                 "/opt/test/bin/pip install /packages/livingproof-*.whl "
+                 "/packages/livingproof_common-*.whl; "
+                 "PATH=/opt/test/bin:$PATH /opt/test/bin/python /management_probe.py wheel")
+    run([*docker(), "-e", "DEBIAN_FRONTEND=noninteractive",
+         "-v", f"{ROOT}/tools/plugin_management_probe.py:/management_probe.py:ro",
+         distribution, "sh", "-c", "set -eu; apt-get update -qq; " + setup])
