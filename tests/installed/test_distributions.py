@@ -114,3 +114,10 @@ def test_bash_completion_lifecycle(distribution):
     )
     run([*docker(), "-v", f"{ROOT}/tools/completion_probe.py:/completion_probe.py:ro",
          distribution, "sh", "-c", command])
+
+
+@pytest.mark.parametrize("distribution", ["debian:13-slim", "ubuntu:noble"])
+def test_default_bash_startup_and_cli_recovery(distribution):
+    command = ("apt-get update -qq && apt-get install -y --no-install-recommends python3 "
+               "&& python3 /tools/completion_startup_probe.py")
+    run([*docker(), "-v", f"{ROOT}/tools:/tools:ro", distribution, "sh", "-c", command])

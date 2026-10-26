@@ -169,46 +169,74 @@ FAIL/INSUFFICIENT_EVIDENCE grades are expected evidence outcomes, not test-run f
 
 ### Shell completion
 
-On Debian 12/13 and Ubuntu 24.04, the Debian package owns
-`/usr/share/bash-completion/completions/livingproof` and recommends
-`bash-completion`. With that package installed and enabled in your interactive
-Bash shell, completion loads on demand. No installer edits shell startup files.
-If needed, enable it for the current session with
-`. /usr/share/bash-completion/bash_completion`.
-
-Try `livingproof <TAB>`, `livingproof capability <TAB>`, then
-`livingproof capability report <TAB>`. When the reporter is installed in the
-same Python environment, completion continues into its commands, options,
-choices and file arguments. Installing a plugin after the root requires no
-regeneration: each completion queries installed entry points. Completion does
-not install missing plugins or execute command callbacks. Listing plugins avoids
-importing them; completing inside one imports its Click command, so install only
-trusted plugins. An absent reporter has no report subcommands to suggest.
-
-Wheel installs include the loader under the environment's
-`share/bash-completion/completions/livingproof`. Bash-completion 2.12+ can discover
-this relative to the executable. For older versions, explicitly generate a
-user-owned registration with the intended environment's executable on `PATH`:
+The installed CLI contains setup and diagnostics; no checkout or README is needed:
 
 ```sh
-completion_dir="${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions"
-mkdir -p "$completion_dir"
-_LIVINGPROOF_COMPLETE=bash_source livingproof > "$completion_dir/livingproof"
+livingproof completion status
 ```
 
-Remove that user-owned file yourself when uninstalling the wheel. Package-owned
-files are removed by pip or apt; a shell that already loaded a completion retains
-its function until restarted (or `complete -r livingproof`).
+Enable completion in the **current Bash shell**, even without bash-completion:
 
-For an explicit current-session Zsh setup, use
+```sh
+eval "$(livingproof completion bash)"
+complete -p livingproof
+```
+
+Then try `livingproof cap<TAB>` and `livingproof capability report <TAB>`.
+Completion continues into installed plugins, their options, choices and paths.
+It discovers plugins installed later without regenerating the registration and
+does not execute command callbacks or install plugins.
+
+The Debian package owns
+`/usr/share/bash-completion/completions/livingproof` and recommends
+`bash-completion`. Those files alone do **not** enable an existing shell. Stock
+Ubuntu/Debian container root startup files leave the framework disabled in plain
+non-login `bash`, including a fresh shell after package installation. For a new
+shell using the distribution's normal login startup:
+
+```sh
+# Run apt as an administrator if bash-completion is missing.
+apt install bash-completion
+bash --login
+```
+
+This lets the framework discover the package-owned registration lazily. For an
+already-running shell or a non-login shell, use the current-shell activation
+command above. A package installer cannot modify its parent shell. The status
+command reports files and gives exact instructions; it cannot inspect whether
+functions are loaded in the calling shell.
+
+For a wheel/virtual environment, put the intended executable on `PATH` and use:
+
+```sh
+livingproof completion install
+```
+
+This explicitly writes only a user registration under
+`${BASH_COMPLETION_USER_DIR}/completions`, or
+`${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions` by default.
+It refuses unrelated existing files and symlinks. It does not install the
+framework, request administrator privileges or edit startup files. Future shells
+still need the framework loaded, or the current-shell activation command.
+`livingproof completion install --remove` removes only the registration it owns.
+Debian/pip remove their own package files; a loaded shell function lasts until
+exit or `complete -r livingproof`.
+
+For persistent non-login activation without the framework, users may choose to
+add `eval "$(livingproof completion bash)"` to their own `.bashrc` themselves.
+No Living Proof command edits that file.
+
+For explicit current-session Zsh setup, use
 `eval "$(_LIVINGPROOF_COMPLETE=zsh_source livingproof)"` after `compinit`.
 For Fish, use `_LIVINGPROOF_COMPLETE=fish_source livingproof | source`.
-These follow Click's setup protocol; only Bash is exercised by our shell tests.
-Standalone reporter registration belongs to the reporter package; this package
-registers the root command, including nested installed reporter completion.
+Only Bash is exercised by the shell tests; other-shell compatibility is not
+claimed. Standalone reporter registration belongs to the reporter package.
 
-The installed tests exercise fresh Bash shells and the real reporter on the
-native architectures in CI. Registration follows
+Tests include actual Readline Tab in default-startup Bash pseudo-terminals,
+installation during a running shell, absent/present frameworks, documented
+current-shell recovery, automatic login-shell loading, nested plugin completion
+and removal. The older adapter tests that explicitly source the framework remain
+separate from these startup tests. See
 [bash-completion's package guidance](https://sources.debian.org/src/bash-completion/1:2.16.0-7/README.md/)
 and [Click's completion protocol](https://click.palletsprojects.com/en/stable/shell-completion/).
 
