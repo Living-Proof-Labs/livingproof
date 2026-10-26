@@ -34,12 +34,18 @@ def smoke():
         run([python, "-m", "pip", "install", wheels[0]], work)
         assert "capability" in run([command], work)
         assert "same Python environment" in run([command, "capability", "report"], work, 1)
-        completion_setup = (
-            f'source "{work}/env/share/bash-completion/completions/livingproof"'
-        )
+        completion_setup = 'eval "$(livingproof completion bash)"'
+        user_env = {**os.environ, "XDG_DATA_HOME": str(work / "user-data"),
+                    "BASH_COMPLETION_USER_DIR": ""}
+        run([command, "completion", "install"], work, env=user_env)
+        registration = work / "user-data/bash-completion/completions/livingproof"
+        assert registration.is_file()
         previous_path = os.environ.get("PATH", "")
         os.environ["PATH"] = str(bin_dir) + os.pathsep + previous_path
         completion_probe("absent", completion_setup)
+        completion_probe("absent", f'source "{registration}"')
+        run([command, "completion", "install", "--remove"], work, env=user_env)
+        assert not registration.exists()
         for shell in ("bash", "zsh", "fish"):
             script = run([command], work, env={**os.environ,
                          "_LIVINGPROOF_COMPLETE": f"{shell}_source"})

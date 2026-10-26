@@ -6,6 +6,8 @@ import re
 import click
 from click.shell_completion import CompletionItem
 
+from .completion import completion
+
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
     "Install the livingproof-capability-report v1.4.0 wheel into the same Python environment "
@@ -82,8 +84,11 @@ def main(ctx):
 
     Plugins come from packages explicitly installed in this Python environment.
 
-    Bash completion is registered by the Debian package with bash-completion.
-    For wheel installs and other shells, see the README shell completion section.
+    \b
+    Enable tab completion in this Bash shell:
+      eval "$(livingproof completion bash)"
+    For installed-file status and new-shell setup:
+      livingproof completion status
     """
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
@@ -95,3 +100,6 @@ def capability(ctx):
     """Work with capability evidence through installed plugins."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+
+
+main.add_command(completion)
