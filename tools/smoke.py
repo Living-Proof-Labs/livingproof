@@ -31,7 +31,11 @@ def smoke():
         bin_dir = work / "env" / ("Scripts" if os.name == "nt" else "bin")
         python = bin_dir / "python"
         command = bin_dir / "livingproof"
-        run([python, "-m", "pip", "install", wheels[0]], work)
+        run([python, "-m", "pip", "install", distribution / "livingproof_common-1.0.0-py3-none-any.whl", wheels[0]], work)
+        version_env = {**os.environ, "PATH": str(bin_dir)}
+        root_version = run([command, "--version"], work, env=version_env)
+        assert root_version.startswith("livingproof, version ")
+        assert "identity source: recorded-build" in root_version
         assert "capability" in run([command], work)
         assert "same Python environment" in run([command, "capability", "report"], work, 1)
         completion_setup = 'eval "$(livingproof completion bash)"'
@@ -76,6 +80,11 @@ def smoke():
             completion_probe("installed", completion_setup)
             shutil.copytree(Path(bundle).resolve(), work / "bundle")
             standalone = bin_dir / "livingproof-capability-report"
+            nested_version = run([command, "capability", "report", "--version"],
+                                 work, env=version_env)
+            standalone_version = run([standalone, "--version"], work, env=version_env)
+            assert nested_version.split(", version ", 1)[1] == standalone_version.split(", version ", 1)[1]
+            assert run([command, "--version"], work, env=version_env) == root_version
             for prefix, label in [([command, "capability", "report"], "nested"),
                                   ([standalone], "standalone")]:
                 run([*prefix, "--help"], work)
@@ -106,7 +115,7 @@ def smoke():
         assert len(sources) == 1, "Build exactly one source archive first"
         venv.create(work / "source-env", with_pip=True)
         source_bin = work / "source-env" / ("Scripts" if os.name == "nt" else "bin")
-        run([source_bin / "python", "-m", "pip", "install", sources[0]], work)
+        run([source_bin / "python", "-m", "pip", "install", distribution / "livingproof_common-1.0.0-py3-none-any.whl", sources[0]], work)
         assert "capability" in run([source_bin / "livingproof", "--help"], work)
         assert run([command, "--version"], work) == run(
             [source_bin / "livingproof", "--version"], work)

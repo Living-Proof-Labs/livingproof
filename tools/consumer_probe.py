@@ -16,6 +16,21 @@ def run(args, expected=0):
     return result.stdout + result.stderr
 
 
+def root_version():
+    from livingproof.version import current_version
+    from livingproof_common.versioning import read_provenance, PROVENANCE
+    import livingproof
+    identity, package, source = current_version()
+    assert source == "recorded-build"
+    saved = read_provenance(Path(livingproof.__file__).parent / PROVENANCE, "livingproof")
+    assert saved and saved["identity"]["commit"]
+    output = run(["livingproof", "--version"])
+    assert f"livingproof, version {identity}\n" in output
+    assert f"Package: {package}; identity source: recorded-build" in output
+    return {"display_version": identity, "package_version": package,
+            "identity_source": source, "provenance": saved}
+
+
 def root_only():
     assert "capability" in run(["livingproof", "--help"])
     assert "No packages are installed automatically" in run(
@@ -23,6 +38,11 @@ def root_only():
 
 
 def combined():
+    nested_version = run(["livingproof", "capability", "report", "--version"])
+    standalone_version = run(["livingproof-capability-report", "--version"])
+    # Older pinned reporters use Click’s invocation name; compare version payload.
+    assert nested_version.split(", version ", 1)[1] == standalone_version.split(", version ", 1)[1]
+    assert standalone_version.startswith("livingproof-capability-report, version ")
     from livingproof.cli import main
     from livingproof_capability_report import grade
     assert "/workspace" not in __import__("livingproof").__file__
@@ -59,7 +79,8 @@ def combined():
 
 def probe(args):
     assert platform.machine() == os.environ["COMPATIBILITY_HOST_MACHINE"]
-    versions = {"livingproof": metadata.version("livingproof"), "click": metadata.version("click")}
+    root_identity = root_version()
+    versions = {"livingproof-common": metadata.version("livingproof-common"), "livingproof": metadata.version("livingproof"), "click": metadata.version("click")}
     if args.mode in ("root", "debian"):
         root_only()
     if args.mode == "debian":
@@ -77,7 +98,7 @@ def probe(args):
         run(["livingproof-capability-report", "--help"])
         run(["python3", "-c", "import importlib.util; "
              "assert importlib.util.find_spec('livingproof') is None"])
-    record = {"os": platform.freedesktop_os_release(), "architecture": platform.machine(),
+    record = {"build_identity": root_identity, "os": platform.freedesktop_os_release(), "architecture": platform.machine(),
               "python": platform.python_version(), "execution": "native",
               "install_method": args.mode, "versions": versions, "outcome": "PASS",
               "evidence": os.environ.get("COMPATIBILITY_EVIDENCE", "local execution")}

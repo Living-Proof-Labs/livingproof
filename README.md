@@ -23,7 +23,7 @@ versioned policy-based grade → portable report.**
 4. Apply an explicit, versioned grading policy to decide the final grade. A model's
    proposed grade is an input, not authority to silently replace that policy.
 5. Produce a portable report with the existing
-   [capability reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.4.0).
+   [capability reporter v1.6.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.6.0).
    It validates bundles, grades with its supported policy, and renders saved decisions
    as terminal tables, JSON, HTML or CSV. Evidence stays in the bundle. Rendering
    does not regrade. These fixture demonstrations do not establish robot safety certification.
@@ -33,9 +33,9 @@ versioned policy-based grade → portable report.**
 | Area | Status |
 | --- | --- |
 | Specs, deterministic fixtures, mock AI and recorded human fixture assessments | Existing versioned ecosystem repositories linked above |
-| Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.4.0 |
+| Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.6.0 |
 | Thin root command and installed Click plugin discovery | Implemented; wheel, source, Debian and native container distributions use the shared release workflow |
-| Reporter plugin registration | Implemented by reporter v1.4.0; its standalone command and library remain independent |
+| Reporter plugin registration | Implemented by reporter v1.6.0; its standalone command and library remain independent |
 | Real evaluator/provider integrations and robot/simulator adapters | Candidate designs only; no credentials, model calls or adapters delivered here |
 
 Full MCAP recordings may be evidence inputs. A future adapter may extract signals,
@@ -74,19 +74,19 @@ the root command. Nothing is downloaded or installed by the CLI at runtime.
 | --- | --- | --- |
 | Debian/Ubuntu | Root `all.deb`, installed with apt | Reporter `all.deb`, installed with apt; both use `/usr/bin/python3` |
 | Python virtual environment | Root wheel or source distribution | Reporter wheel installed into that same virtual environment |
-| Container | Versioned root image | Explicit `-reporting` image variant includes reporter v1.4.0 |
+| Container | Versioned root image | Explicit `-reporting` image variant includes reporter v1.6.0 |
 
 ### Debian and Ubuntu
 
 Download the root `.deb` and checksums into `root-release`. Download the reporter
 `.deb` and its checksums from
-[reporter v1.4.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0)
+[reporter v1.6.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.6.0)
 into `reporter-release`. Then:
 
 ```sh
 (cd root-release && sha256sum --ignore-missing -c SHA256SUMS)
 (cd reporter-release && sha256sum --ignore-missing -c SHA256SUMS)
-sudo apt install ./root-release/livingproof_*_all.deb
+sudo apt install ./root-release/python3-livingproof-common_1.0.0_all.deb ./root-release/livingproof_*_all.deb
 livingproof --help
 livingproof capability report --help  # explains that the plugin is not installed yet
 sudo apt install ./reporter-release/livingproof-capability-report_*_all.deb
@@ -110,7 +110,7 @@ than assuming a configured target passed. Unsupported distributions are unverifi
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install ./root-release/livingproof-*.whl
+.venv/bin/pip install ./root-release/livingproof_common-1.0.0-py3-none-any.whl ./root-release/livingproof-*.whl
 .venv/bin/pip install ./reporter-release/livingproof_capability_report-*.whl
 .venv/bin/livingproof capability report --help
 ```
@@ -118,7 +118,7 @@ python3 -m venv .venv
 Use Python 3.11 or newer. Separate pipx environments cannot discover each other's
 plugins. The independently installed reporter command and Python library remain
 available; see the
-[reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.4.0/README.md).
+[reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.6.0/README.md).
 
 ### Containers
 
@@ -127,7 +127,7 @@ Task, runtime network dependency or automatic plugin installation:
 
 - `ghcr.io/living-proof-labs/livingproof:VERSION` contains the root command only.
 - `ghcr.io/living-proof-labs/livingproof:VERSION-reporting` contains root plus the
-  pinned reporter v1.4.0. Its standalone command and library remain installed.
+  pinned reporter v1.6.0. Its standalone command and library remain installed.
 
 Use an explicit released version, never a moving `latest` tag. Native amd64/arm64
 images are also attached as `image-ARCH.tar` and `reporting-image-ARCH.tar`; saved
@@ -153,12 +153,12 @@ plugin lives in the same `/opt/livingproof` Python environment as the root.
 ### Produce a report
 
 Use an existing portable evidence bundle. For a fixture demonstration, download
-the reporter v1.4.0 source archive and verify its published checksum, then extract
+the reporter v1.6.0 source archive and verify its published checksum, then extract
 only its example data (no source checkout or source execution is required):
 
 ```sh
-tar -xzf reporter-release/livingproof_capability_report-1.4.0.tar.gz \
-  --strip-components=2 livingproof_capability_report-1.4.0/examples/bundle
+tar -xzf reporter-release/livingproof_capability_report-1.6.0.tar.gz \
+  --strip-components=2 livingproof_capability_report-1.6.0/examples/bundle
 livingproof capability report validate bundle/manifest.json
 livingproof capability report grade bundle/manifest.json -o report.json
 livingproof capability report render report.json --format html -o report.html
@@ -250,3 +250,35 @@ small and link versioned ecosystem documentation rather than copying it here.
 
 Original tooling and reusable examples are Apache-2.0; original written content
 is CC BY 4.0. See [explicit license boundaries](LICENSE.md).
+
+## Identify the build being tested
+
+Run `livingproof --version` and include both lines in problem reports. The first
+line identifies this tool's source/build; the second reports installed PEP 440
+package metadata and whether identity came from a live checkout or recorded build.
+
+```sh
+livingproof --version
+livingproof capability report --version
+livingproof-capability-report --version
+```
+
+Root uses released [livingproof-common v1.0.0](https://github.com/Living-Proof-Labs/livingproof-common/releases/tag/v1.0.0)
+with its own package directory. Nested reporting retains the reporter's identity;
+common's library version is never substituted for either consumer. The reporter
+release pin remains explicit in `reporter-release.txt`.
+
+A clean exact release tag displays X.Y.Z. Development output includes release
+base, commit distance/hash, bounded public branch label and clean/dirty state.
+Editable installs update dirty state without reinstalling. Dirty state is not a
+digest of uncommitted content. Missing Git, empty, shallow and untagged history
+are explicit. Only approved public-origin tracking branches are eligible for
+named labels; other local branches stay `local` or `detached`. Installed artifacts
+retain their own build snapshot without Git and ignore the caller's directory.
+
+Hatch-VCS still supplies PEP 440 package metadata; the shared library supplies
+source identity. Both build and runtime pin common v1.0.0. Packaging includes the
+unchanged upstream common wheel and Debian library after checking their published
+SHA-256 digests. Offline container installs resolve it from the wheelhouse. Install
+the common `.deb` alongside root's `.deb`; no apt repository or PyPI availability
+is assumed. Runtime commands never download or install dependencies.

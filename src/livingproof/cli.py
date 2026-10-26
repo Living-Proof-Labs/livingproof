@@ -10,10 +10,10 @@ from .completion import completion
 
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
-    "Install the livingproof-capability-report v1.4.0 wheel into the same Python environment "
+    "Install the livingproof-capability-report v1.6.0 wheel into the same Python environment "
     "as livingproof. For a Debian-installed root, install the reporter all.deb with apt instead. "
     "Download it and verify SHA256SUMS from https://github.com/"
-    "Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.4.0. "
+    "Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.6.0. "
     "No packages are installed automatically."
 )
 
@@ -76,8 +76,19 @@ class Plugins(click.Group):
         return command
 
 
+def show_version(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    from .version import current_version
+    identity, package, source = current_version()
+    click.echo(f"livingproof, version {identity}")
+    click.echo(f"Package: {package}; identity source: {source}")
+    ctx.exit()
+
+
 @click.group(invoke_without_command=True)
-@click.version_option(package_name="livingproof")
+@click.option("--version", is_flag=True, is_eager=True, expose_value=False,
+              callback=show_version, help="Show this tool’s build identity and package version.")
 @click.pass_context
 def main(ctx):
     """Living Proof Labs: specs, evidence, assessments and portable reports.

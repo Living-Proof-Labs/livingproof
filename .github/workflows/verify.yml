@@ -128,7 +128,7 @@ jobs:
         run: |
           mkdir dist
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-          for name in SHA256SUMS "livingproof-${VERSION}-py3-none-any.whl" "livingproof-${VERSION}.tar.gz" "livingproof_${VERSION}_all.deb" "image-${{ matrix.architecture }}.tar" "reporting-image-${{ matrix.architecture }}.tar"; do
+          for name in SHA256SUMS "livingproof_common-1.0.0-py3-none-any.whl" "python3-livingproof-common_1.0.0_all.deb" "livingproof-${VERSION}-py3-none-any.whl" "livingproof-${VERSION}.tar.gz" "livingproof_${VERSION}_all.deb" "image-${{ matrix.architecture }}.tar" "reporting-image-${{ matrix.architecture }}.tar"; do
             curl --retry 3 -fsSL "$base/$name" -o "dist/$name"
           done
           (cd dist && sha256sum --ignore-missing -c SHA256SUMS)
