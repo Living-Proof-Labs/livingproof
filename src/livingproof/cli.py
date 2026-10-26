@@ -7,13 +7,13 @@ import click
 from click.shell_completion import CompletionItem
 
 from .completion import completion
+from .plugin_management import plugins
 
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
-    "Install the livingproof-capability-report v1.6.0 wheel into the same Python environment "
-    "as livingproof. For a Debian-installed root, install the reporter all.deb with apt instead. "
-    "Download it and verify SHA256SUMS from https://github.com/"
-    "Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.6.0. "
+    "Install explicitly with: livingproof plugins install livingproof-capability-report. "
+    "To pin a release, append --version 1.6.0. The installer targets the same Python environment or Debian package "
+    "context as livingproof and verifies the required common dependency. "
     "No packages are installed automatically."
 )
 
@@ -114,3 +114,5 @@ def capability(ctx):
 
 
 main.add_command(completion)
+
+main.add_command(plugins)

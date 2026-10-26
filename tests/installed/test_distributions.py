@@ -121,3 +121,19 @@ def test_default_bash_startup_and_cli_recovery(distribution):
     command = ("apt-get update -qq && apt-get install -y --no-install-recommends python3 "
                "&& python3 /tools/completion_startup_probe.py")
     run([*docker(), "-v", f"{ROOT}/tools:/tools:ro", distribution, "sh", "-c", command])
+
+
+@pytest.mark.parametrize("distribution", ["debian:12-slim", "debian:13-slim", "ubuntu:24.04"])
+@pytest.mark.parametrize("mode", ["deb", "wheel"])
+def test_explicit_plugin_management(distribution, mode):
+    if mode == "deb":
+        setup = ("apt-get install -y ca-certificates /packages/livingproof_*_all.deb "
+                 "/packages/python3-livingproof-common_*_all.deb; "
+                 "python3 /management_probe.py deb")
+    else:
+        setup = ("apt-get install -y ca-certificates python3-venv; "
+                 "python3 -m venv /opt/test; "
+                 "/opt/test/bin/pip install --no-index --find-links=/packages/wheels livingproof; "
+                 "PATH=/opt/test/bin:$PATH /opt/test/bin/python /management_probe.py wheel")
+    run([*docker(), "-v", f"{ROOT}/tools/plugin_management_probe.py:/management_probe.py:ro",
+         distribution, "sh", "-c", "set -eu; apt-get update -qq; " + setup])
