@@ -35,6 +35,7 @@ Section: python
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.11), python3-click (>= 8.1)
+Recommends: bash-completion
 Suggests: livingproof-capability-report (>= 1.4.0)
 Maintainer: Living Proof Labs <rivet@rollerbot.ai>
 Description: Thin Living Proof Labs command with installed plugin discovery

@@ -93,3 +93,24 @@ def test_portable_debian_metadata():
     assert "usr/lib/python3/dist-packages/livingproof" in listing
     assert "entry_points.txt" in listing
     assert ".so" not in listing
+
+
+@pytest.mark.parametrize("distribution", ["debian:12-slim", "debian:13-slim", "ubuntu:24.04"])
+def test_bash_completion_lifecycle(distribution):
+    command = (
+        "set -eu; apt-get update -qq; "
+        "apt-get install -y bash-completion /packages/livingproof_*_all.deb; "
+        "dpkg-query -S /usr/share/bash-completion/completions/livingproof; "
+        "python3 /completion_probe.py absent; "
+        "apt-get install -y /reporter.deb; "
+        "python3 /completion_probe.py installed; "
+        "apt-get remove -y livingproof-capability-report; "
+        "python3 /completion_probe.py absent; "
+        "apt-get remove -y livingproof; "
+        "test ! -e /usr/share/bash-completion/completions/livingproof; "
+        "bash --noprofile --norc -c 'source /usr/share/bash-completion/bash_completion; "
+        "_completion_loader livingproof || :; "
+        "! declare -F _livingproof_completion; ! command -v livingproof'"
+    )
+    run([*docker(), "-v", f"{ROOT}/tools/completion_probe.py:/completion_probe.py:ro",
+         distribution, "sh", "-c", command])

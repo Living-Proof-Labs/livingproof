@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import venv
 
+from completion_probe import probe as completion_probe
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -32,6 +34,12 @@ def smoke():
         run([python, "-m", "pip", "install", wheels[0]], work)
         assert "capability" in run([command], work)
         assert "same Python environment" in run([command, "capability", "report"], work, 1)
+        completion_setup = (
+            f'source "{work}/env/share/bash-completion/completions/livingproof"'
+        )
+        previous_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + previous_path
+        completion_probe("absent", completion_setup)
         for shell in ("bash", "zsh", "fish"):
             script = run([command], work, env={**os.environ,
                          "_LIVINGPROOF_COMPLETE": f"{shell}_source"})
@@ -59,6 +67,7 @@ def smoke():
         assert bool(reporter) == bool(bundle), "Set both REPORTER_WHEEL and REPORTER_BUNDLE"
         if reporter:
             run([python, "-m", "pip", "install", Path(reporter).resolve()], work)
+            completion_probe("installed", completion_setup)
             shutil.copytree(Path(bundle).resolve(), work / "bundle")
             standalone = bin_dir / "livingproof-capability-report"
             for prefix, label in [([command, "capability", "report"], "nested"),
@@ -81,6 +90,9 @@ def smoke():
                 "COMP_WORDS": "livingproof capability report r", "COMP_CWORD": "3"})
             assert "plain,render" in completion
             run([python, "-c", "from livingproof_capability_report import grade, render"], work)
+            run([python, "-m", "pip", "uninstall", "-y", "livingproof-capability-report"], work)
+            completion_probe("absent", completion_setup)
+            run([python, "-m", "pip", "install", Path(reporter).resolve()], work)
             print("PASS: clean installed real reporter delegation, all formats, errors and completion")
         else:
             print("NOT RUN: real reporter consumption (set REPORTER_WHEEL and REPORTER_BUNDLE)")
@@ -102,6 +114,9 @@ def smoke():
             record.update(outcome="PASS", execution="native", install_method="wheel-and-source",
                           evidence=os.environ.get("COMPATIBILITY_EVIDENCE", "local execution"))
             Path(os.environ["SMOKE_RECORD"]).write_text(json.dumps(record, indent=2) + "\n")
+        run([python, "-m", "pip", "uninstall", "-y", "livingproof"], work)
+        assert not (work / "env/share/bash-completion/completions/livingproof").exists()
+        os.environ["PATH"] = previous_path
         print("PASS: root wheel/source, missing plugin, installed discovery and completion generation")
 
 

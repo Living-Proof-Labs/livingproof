@@ -86,3 +86,36 @@ def test_plugin_explicit_exit_code(entries):
         ctx.exit(7)
     entries.append(ep("report", report))
     assert run("capability", "report").exit_code == 7
+
+
+def test_completion_listing_does_not_import_plugins(entries):
+    imports = []
+
+    def forbidden():
+        imports.append(True)
+        raise AssertionError("listing imported a plugin")
+    entries.append(SimpleNamespace(name="inspect", load=forbidden))
+    result = CliRunner().invoke(cli.main, [], prog_name="livingproof", env={
+        "_LIVINGPROOF_COMPLETE": "bash_complete", "COMP_WORDS": "livingproof capability i",
+        "COMP_CWORD": "2"})
+    assert result.exit_code == 0
+    assert result.output == "plain,inspect\n"
+    assert imports == []
+
+
+def test_nested_completion_never_invokes_callbacks(entries):
+    @click.group()
+    def report():
+        pytest.fail("report callback executed")
+
+    @report.command()
+    @click.option("--format", type=click.Choice(["html", "json"]))
+    def render(format):
+        pytest.fail("render callback executed")
+
+    entries.append(ep("report", report))
+    result = CliRunner().invoke(cli.main, [], prog_name="livingproof", env={
+        "_LIVINGPROOF_COMPLETE": "bash_complete",
+        "COMP_WORDS": "livingproof capability report render --format h", "COMP_CWORD": "5"})
+    assert result.exit_code == 0
+    assert result.output == "plain,html\n"

@@ -4,6 +4,7 @@ from importlib.metadata import entry_points
 import re
 
 import click
+from click.shell_completion import CompletionItem
 
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
@@ -40,6 +41,15 @@ class Plugins(click.Group):
     def list_commands(self, ctx):
         return sorted({"report", *self.candidates()})
 
+    def shell_complete(self, ctx, incomplete):
+        # Listing plugins must not import them. Click resolves the selected entry
+        # through get_command during resilient parsing for deeper completions.
+        commands = [] if incomplete.startswith("-") else [
+            CompletionItem(name) for name in self.list_commands(ctx)
+            if name.startswith(incomplete)
+        ]
+        return commands + click.Command.shell_complete(self, ctx, incomplete)
+
     def format_commands(self, ctx, formatter):
         found = self.candidates()
         rows = [(name, "Installed plugin" if name in found else "Optional reporting plugin (install required)")
@@ -71,6 +81,9 @@ def main(ctx):
     """Living Proof Labs: specs, evidence, assessments and portable reports.
 
     Plugins come from packages explicitly installed in this Python environment.
+
+    Bash completion is registered by the Debian package with bash-completion.
+    For wheel installs and other shells, see the README shell completion section.
     """
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
