@@ -183,6 +183,7 @@ def test_optional_api_token_never_sent_to_assets(monkeypatch):
         headers.append(dict(req.header_items()))
         return BytesIO(b'{}')
     monkeypatch.setattr(pm, 'urlopen', opened)
+    monkeypatch.setattr(pm, 'build_opener', lambda handler: SimpleNamespace(open=opened))
     pm.request('https://api.github.com/repos/Living-Proof-Labs/livingproof/releases')
     pm.request('https://github.com/Living-Proof-Labs/livingproof/releases/download/v1/SHA256SUMS')
     assert headers[0]['Authorization'] == 'Bearer test-only-token'
@@ -194,3 +195,8 @@ def test_debian_asset_architecture_selection(monkeypatch):
     assets = [{'name': f'{pm.REPORTER}_1.6.0_{arch}.deb'} for arch in ('amd64', 'arm64')]
     selected = pm.select(pm.REPORTER, {'tag_name': 'v1.6.0', 'assets': assets}, 'deb')
     assert selected['name'].endswith('_arm64.deb')
+
+
+def test_authenticated_redirect_refuses_credential_forwarding():
+    with pytest.raises(Exception, match='no credentials forwarded'):
+        pm.NoAuthenticatedRedirect().redirect_request(None, None, 302, '', {}, 'https://evil')

@@ -15,7 +15,7 @@ import sysconfig
 import tempfile
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 import zipfile
 
 import click
@@ -34,15 +34,22 @@ def fail(message):
     raise click.ClickException(message)
 
 
+class NoAuthenticatedRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        fail('Authenticated release API request redirected unexpectedly; no credentials forwarded.')
+
+
 def request(url):
     headers = {'User-Agent': 'livingproof-plugin-manager',
                'Accept': 'application/vnd.github+json'}
     # Optional existing CI token is scoped to the API host, never release downloads.
     token = os.environ.get('LIVINGPROOF_GITHUB_TOKEN')
+    open_request = urlopen
     if token and urlparse(url).netloc == 'api.github.com':
         headers['Authorization'] = 'Bearer ' + token
+        open_request = build_opener(NoAuthenticatedRedirect()).open
     try:
-        with urlopen(Request(url, headers=headers),
+        with open_request(Request(url, headers=headers),
                      timeout=30) as response:
             data = response.read(128 * 1024 * 1024 + 1)
             if len(data) > 128 * 1024 * 1024:
