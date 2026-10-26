@@ -72,7 +72,7 @@ def probe(released=False):
             expect(shell, "livingproof capability report re", "livingproof capability report re")
             shell.run("apt-get remove -y livingproof")
         with BashSession(work, login=True) as shell:
-            shell.run("test ! -e /usr/share/bash-completion/completions/livingproof; "
+            shell.run("test ! -e /usr/share/bash-completion/completions/livingproof && "
                       "! command -v livingproof")
             expect(shell, "livingproof cap", "livingproof cap-filesystem-fallback ")
         assert sorted(p.name for p in work.iterdir()) == ["cap-filesystem-fallback", "manifest sample.json"]
