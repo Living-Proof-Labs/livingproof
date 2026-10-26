@@ -323,7 +323,8 @@ to api.github.com, never to release download hosts.
 
 The explicit install command prints all verified artifacts, target and operation
 before mutation, never prompts, never invokes sudo and never handles passwords.
-For a system install an administrator must explicitly run the command from the
+The Debian operation repairs missing dependencies using the supplied artifacts and
+refuses package removals. For a system install an administrator must explicitly run the command from the
 Debian installation with appropriate privileges. `--dry-run` downloads and verifies
 but does not install. Ordinary commands, help and completion never install or
 fetch anything. `status` reads local metadata and checks that the discovered plugin

@@ -141,6 +141,7 @@ def context():
 
 def select(name, rel, mode):
     candidates = []
+    architecture = run(['dpkg', '--print-architecture']) if mode == 'deb' else None
     for asset in rel.get('assets', []):
         filename = asset.get('name', '')
         if mode == 'wheel' and filename.endswith('.whl'):
@@ -150,7 +151,9 @@ def select(name, rel, mode):
                 continue
             if dist == canonicalize_name(name) and tags.intersection(sys_tags()):
                 candidates.append(asset)
-        elif mode == 'deb' and filename.startswith(REGISTRY[name][1] + '_') and filename.endswith('.deb'):
+        elif (mode == 'deb' and filename.startswith(REGISTRY[name][1] + '_')
+              and filename.endswith('.deb')
+              and filename.rsplit('_', 1)[-1][:-4] in ('all', architecture)):
             candidates.append(asset)
     if len(candidates) != 1:
         fail(f'{name} {rel["tag_name"]}: expected one compatible {mode} asset; found '
@@ -242,7 +245,8 @@ def install(name, version, dry_run=False):
             paths.append(common)
         paths.append(plugin)
         if mode == 'deb':
-            command = ['apt-get', 'install', '--yes', '--allow-downgrades', *map(str, paths)]
+            command = ['apt-get', 'install', '--yes', '--allow-downgrades',
+                       '--fix-broken', '--no-remove', *map(str, paths)]
             target = 'system Debian packages (requires an already privileged process)'
         else:
             command = [sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check',
