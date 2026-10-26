@@ -135,6 +135,8 @@ jobs:
       - run: task setup
       - run: uv run --locked --no-sync python tools/fetch_reporter.py --distributions
       - run: task test:installed
+        env:
+          LIVINGPROOF_GITHUB_TOKEN: ${{ github.token }}
       - uses: ./.github/actions/test-results
         if: ${{ !cancelled() }}
         with:

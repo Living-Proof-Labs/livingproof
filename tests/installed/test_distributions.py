@@ -133,7 +133,8 @@ def test_explicit_plugin_management(distribution, mode):
     else:
         setup = ("apt-get install -y ca-certificates python3-venv; "
                  "python3 -m venv /opt/test; "
-                 "/opt/test/bin/pip install --no-index --find-links=/packages/wheels livingproof; "
+                 "/opt/test/bin/pip install /packages/livingproof-*.whl "
+                 "/packages/livingproof_common-*.whl; "
                  "PATH=/opt/test/bin:$PATH /opt/test/bin/python /management_probe.py wheel")
     run([*docker(), "-e", "DEBIAN_FRONTEND=noninteractive",
          "-v", f"{ROOT}/tools/plugin_management_probe.py:/management_probe.py:ro",

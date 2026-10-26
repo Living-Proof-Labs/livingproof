@@ -45,7 +45,8 @@ def request(url):
     # Optional existing CI token is scoped to the API host, never release downloads.
     token = os.environ.get('LIVINGPROOF_GITHUB_TOKEN')
     open_request = urlopen
-    if token and urlparse(url).netloc == 'api.github.com':
+    parsed = urlparse(url)
+    if token and (parsed.scheme, parsed.netloc) == ('https', 'api.github.com'):
         headers['Authorization'] = 'Bearer ' + token
         open_request = build_opener(NoAuthenticatedRedirect()).open
     try:

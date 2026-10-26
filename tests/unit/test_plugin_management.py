@@ -200,3 +200,35 @@ def test_debian_asset_architecture_selection(monkeypatch):
 def test_authenticated_redirect_refuses_credential_forwarding():
     with pytest.raises(Exception, match='no credentials forwarded'):
         pm.NoAuthenticatedRedirect().redirect_request(None, None, 302, '', {}, 'https://evil')
+
+
+@pytest.mark.parametrize('url', [
+    'http://api.github.com/repos/Living-Proof-Labs/livingproof/releases',
+    'https://api.github.com.evil.invalid/releases',
+    'https://api.github.com@evil.invalid/releases',
+    'https://release-assets.githubusercontent.com/example',
+    'https://github.com/Living-Proof-Labs/livingproof/releases/download/v1/SHA256SUMS',
+])
+def test_token_requires_exact_https_api_origin(monkeypatch, url):
+    from io import BytesIO
+    monkeypatch.setenv('LIVINGPROOF_GITHUB_TOKEN', 'test-only-token')
+    def opened(req, timeout):
+        assert req.get_header('Authorization') is None
+        return BytesIO(b'{}')
+    monkeypatch.setattr(pm, 'urlopen', opened)
+    monkeypatch.setattr(pm, 'build_opener', lambda handler: pytest.fail('authenticated opener'))
+    assert pm.request(url) == b'{}'
+
+
+def test_api_error_does_not_log_token_or_response_details(monkeypatch):
+    token = 'test-only-token-never-log'
+    monkeypatch.setenv('LIVINGPROOF_GITHUB_TOKEN', token)
+    def denied(req, timeout):
+        assert req.get_header('Authorization') == 'Bearer ' + token
+        raise HTTPError(req.full_url, 403, token, {'Authorization': token}, None)
+    monkeypatch.setattr(pm, 'build_opener', lambda handler: SimpleNamespace(open=denied))
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 1
+    assert 'rate limit or access restriction' in result.output
+    assert token not in result.output
+    assert 'Authorization' not in result.output
