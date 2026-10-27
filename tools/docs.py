@@ -30,15 +30,33 @@ SOURCES = {
     'docs/decisions/zensical.md': 'maintainers/docs-decision.md',
 }
 NAV = [
-    ('Home', 'index.md'), ('Command reference', 'commands.md'),
-    ('Installed terminal help', 'terminal-help.md'), ('Executable scenarios', 'scenarios.md'),
-    ('Build provenance', 'provenance.md'),
-    ('Plugin contract', 'guides/plugins.md'), ('Development', 'guides/development.md'),
-    ('Verification and previews', 'guides/verification.md'),
-    ('Pages publication', 'maintainers/pages.md'), ('Release operation', 'maintainers/releases.md'),
+    ('Documentation home', 'https://docs.livingprooflabs.com/'),
+    ('Start here', 'index.md'),
+    ('Guides: plugins', 'guides/plugins.md'), ('Guides: development', 'guides/development.md'),
+    ('Reference: commands', 'commands.md'), ('Reference: installed help', 'terminal-help.md'),
+    ('Reference: tasks', 'tasks.md'), ('Scenarios and results', 'scenarios.md'),
+    ('Verification', 'guides/verification.md'),
+    ('Contribute', 'maintainers/working-agreement.md'), ('Version and source', 'provenance.md'),
+    ('Help / report an issue', 'https://github.com/Living-Proof-Labs/livingproof/issues'),
+    ('License', 'license.md'), ('Pages publication', 'maintainers/pages.md'),
+    ('Release operation', 'maintainers/releases.md'),
     ('Documentation decision', 'maintainers/docs-decision.md'),
-    ('Working agreement', 'maintainers/working-agreement.md'), ('Licensing', 'license.md'),
 ]
+
+
+def task_reference():
+    """Describe the reviewed Taskfile through native introspection, without running tasks."""
+    tasks = json.loads(run(['task', '--list', '--json'], cwd=ROOT))['tasks']
+    lines = ['# Contributor tasks', '',
+             'Host wrappers `dev:build`, `dev:verify` and `dev:shell` invoke Docker. Other',
+             'commands run in the prepared development environment; image, installed-test',
+             'and documentation tasks additionally need the host Docker daemon.',
+             'Do not invoke host Docker wrappers recursively inside the container.', '']
+    for task in sorted(tasks, key=lambda item: item['name']):
+        summary = run(['task', '--summary', task['name']], cwd=ROOT)
+        lines += [f"## {task['name']}", '', '```text', summary.rstrip(), '```', '']
+    return '\n'.join(lines)
+
 
 
 def rewrite_links(text, source):
@@ -82,6 +100,7 @@ def stage():
     for license_file in (ROOT / 'LICENSES').glob('*.txt'):
         shutil.copyfile(license_file, assets / license_file.name)
     shutil.copyfile(ROOT / 'tests/features/installed.feature', assets / 'installed.feature')
+    (common / 'tasks.md').write_text(task_reference())
     rows = results(ROOT / 'artifacts/feature-tests.xml')
     (common / 'feature-results.json').write_text(json.dumps(rows, indent=2) + '\n')
     assert len(rows) == len(scenarios()), 'Incomplete scenario mapping'
@@ -102,6 +121,10 @@ def stage():
     provenance = installed_evidence(common)
     (common / 'provenance.md').write_text(
         '# Build and verification provenance\n\n'
+        'This is the current development manual. Historical manuals are not maintained; '
+        '[source release tags](https://github.com/Living-Proof-Labs/livingproof/tags) preserve past revisions.\n\n'
+        'Software line coverage is not measured here. Scenario outcomes are a separate, bounded measure. '
+        'No private security reporting route is documented; do not post sensitive reports to public issues.\n\n'
         'This manual records the candidate artifacts and scenario result snapshot. Skipped or missing results do not establish passing behavior.\n'
         'Package version 0.0.0 identifies a CI candidate, not a published release.\n\n'
         f"[Source revision]({provenance['source_url']})\n\n"
@@ -190,7 +213,8 @@ print(json.dumps(walk(main, 'livingproof')))
                                        env=env, text=True)
     (OUTPUT / 'installed-commands.json').write_text(commands)
     config = yaml.safe_load((ROOT / 'docs/site/mkdocs.yml').read_text())
-    config.update(docs_dir='source', site_dir='html',
+    config.update(repo_url='https://github.com/Living-Proof-Labs/livingproof',
+                  repo_name='Source', docs_dir='source', site_dir='html',
                   nav=[{label: path} for label, path in NAV])
     config_file = OUTPUT / 'mkdocs.yml'
     config_file.write_text(yaml.safe_dump(config, sort_keys=False))

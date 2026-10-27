@@ -256,7 +256,7 @@ def test_command_fragments_and_assets_in_browser(browser, server):
 def test_canonical_url_and_internal_home_link(output):
     html = (output / 'html/index.html').read_text()
     assert '<link rel="canonical" href="https://docs.livingprooflabs.com/livingproof/index.html">' in html
-    match = re.search(r'<a href="([^"]+)">Documentation: command reference', html)
+    match = re.search(r'<a href="([^"]+)">Start here: documentation', html)
     assert match and match[1] in ('.', './', 'index.html'), match
 
 
