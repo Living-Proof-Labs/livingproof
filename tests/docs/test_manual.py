@@ -105,7 +105,7 @@ def test_installed_command_contract_rendered(output):
     help_doc = Document((output / 'html/terminal-help.html').read_text())
     assert 'Installed terminal help' in ' '.join(help_doc.text)
     assert ':orphan:' not in ' '.join(help_doc.text)
-    assert not (output / 'html/generated-help.html').exists()
+    assert 'terminal-help.html' in (output / 'html/generated-help.html').read_text()
 
 
 def article(page):
@@ -258,3 +258,62 @@ def test_canonical_url_and_internal_home_link(output):
     assert '<link rel="canonical" href="https://docs.livingprooflabs.com/livingproof/index.html">' in html
     match = re.search(r'<a href="([^"]+)">Documentation: command reference', html)
     assert match and match[1] in ('.', './', 'index.html'), match
+
+
+def test_legacy_command_bookmarks(browser, server):
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from docs_compatibility import COMMAND_ALIASES
+    page = browser.new_page()
+    for old, current in COMMAND_ALIASES.items():
+        page.goto(f'{server}/commands.html#{old}')
+        assert page.locator(f'[id="{old}"]').count() == 1
+        expect(page.locator(f'[id="{current}"]')).to_be_in_viewport()
+        old_top = page.locator(f'[id="{old}"]').evaluate('e => e.getBoundingClientRect().top')
+        current_top = page.locator(f'[id="{current}"]').evaluate('e => e.getBoundingClientRect().top')
+        assert abs(old_top - current_top) < 100, (old, current)
+        if old.startswith('livingproof-'):
+            usage = page.locator(f'[id="{current}"]').locator('xpath=following-sibling::div[1]')
+            expect(usage).to_contain_text(old.replace('-', ' '))
+    page.goto(f'{server}/commands.html#installed-terminal-help')
+    page.locator('#installed-terminal-help').get_by_role('link').click()
+    expect(page).to_have_url(f'{server}/terminal-help.html')
+    page.close()
+
+
+def test_legacy_help_url_redirects(browser, server):
+    page = browser.new_page()
+    response = page.goto(f'{server}/generated-help.html')
+    assert response.status == 200
+    expect(page).to_have_url(f'{server}/terminal-help.html')
+    expect(article(page)).to_contain_text('Installed terminal help')
+    expect(article(page)).to_contain_text('$ livingproof capability report validate --help')
+    page.close()
+
+
+def test_legacy_search_url_is_usable(browser, server):
+    page = browser.new_page()
+    response = page.goto(f'{server}/search.html?q=manifest')
+    assert response.status == 200
+    expect(article(page)).to_contain_text('not applied automatically')
+    page.get_by_role('button', name='Search', exact=False).first.click()
+    page.get_by_placeholder('Search', exact=True).fill('manifest')
+    result = page.locator('dialog a[href*="scenarios.html"]').first
+    expect(result).to_be_visible(timeout=15000)
+    result.click()
+    expect(page).to_have_url(re.compile('scenarios.html'))
+    page.close()
+
+
+@pytest.mark.parametrize('path,anchor,expected', [
+    ('index.html', 'living-proof-labs-command-home', 'Living Proof Labs'),
+    ('scenarios.html', 'executable-user-journeys', 'Executable scenarios'),
+    ('scenarios.html', 'outside-this-pilot', 'independent manual review remain outside'),
+])
+def test_legacy_guide_bookmarks(browser, server, path, anchor, expected):
+    page = browser.new_page()
+    page.goto(f'{server}/{path}#{anchor}')
+    expect(page.locator(f'#{anchor}')).to_be_attached()
+    assert page.locator(f'#{anchor}').evaluate('e => Math.abs(e.getBoundingClientRect().top) < innerHeight')
+    expect(article(page)).to_contain_text(expected)
+    page.close()

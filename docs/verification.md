@@ -100,6 +100,16 @@ setup or a promise of Android file-provider compatibility. Verify navigation,
 styles and interactive search in the browser; an HTTP response alone is not that
 verification.
 
+## Previously published links
+
+The former `generated-help.html` address redirects to `terminal-help.html` with
+an ordinary fallback link. Published command and option bookmarks remain aliases
+to the corresponding current command section; options are rendered together in
+that section. The old `commands.html#installed-terminal-help` bookmark offers a
+link to the terminal-help page. `search.html?q=...` remains a usable search entry
+page with the normal Search control; old query terms must be entered again.
+These compatibility pages do not change command behavior or the reporter pin.
+
 ## Independent review and limits
 
 Review the changed journeys and adjacent behavior using the built candidate

@@ -14,6 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 import yaml
 
 from feature_results import ROOT, results, scenarios
+from docs_compatibility import preserve_urls
 
 OUTPUT = ROOT / 'artifacts/docs'
 # Explicit source allowlist: no source checkout is exposed as a web root.
@@ -109,7 +110,8 @@ def stage():
         + '```json\n' + json.dumps(provenance, indent=2) + '\n```\n\n'
         + '[Build record](build.json) | [Scenario outcomes](feature-results.json)\n')
     (OUTPUT / 'source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    shutil.copyfile(ROOT / 'docs/site/commands.md', common / 'commands.md')
+    for page in ('commands.md', 'search.md'):
+        shutil.copyfile(ROOT / 'docs/site' / page, common / page)
     return common
 
 
@@ -194,6 +196,7 @@ print(json.dumps(walk(main, 'livingproof')))
     config_file.write_text(yaml.safe_dump(config, sort_keys=False))
     subprocess.run([sys.executable, '-m', 'zensical', 'build', '--clean', '-f', str(config_file)],
                    env=env, cwd=OUTPUT, check=True)
+    preserve_urls(OUTPUT / 'html')
     print(f'Preview {OUTPUT}/html over loopback HTTP; see docs/verification.md')
 
 
