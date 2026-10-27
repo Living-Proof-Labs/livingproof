@@ -15,7 +15,8 @@ def task_reference(root, source):
     lines = ['# Contributor tasks', '',
              'Generated from the reviewed Taskfile using Task --list --json and --summary.', '',
              'Run ordinary tasks in the prepared development environment. Image, installed',
-             'container and lifecycle tasks require a Linux Docker host. The dev:* tasks',
+             'container, lifecycle and docs tasks require a Linux Docker host. Build packages',
+             'and images and run task test:features before task docs. The dev:* tasks',
              'delegate to Docker Compose; do not recurse into them inside that container.', '',
              f'Taskfile SHA-256: `{digest}`', '']
     for task in tasks:
