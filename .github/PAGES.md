@@ -8,7 +8,13 @@ cannot deploy. No `pull_request_target`, privileged `workflow_run` handler, cust
 domain, or additional token is used. The deployment job has only `pages: write`
 and `id-token: write`; it does not check out or execute repository code.
 
-It downloads `documentation-0.0.0-amd64` from the same workflow run, packages its
+Inside its deployment concurrency lock, the job reads the public repository's
+current `main` ref without credentials. A stale run skips every artifact and
+publication step, including when an older run is rerun after a newer deployment.
+A missing, malformed or unavailable ref fails closed. No extra token permission
+is needed. The job does not cancel release jobs.
+
+For a current run, it downloads `documentation-0.0.0-amd64` from the same workflow run, packages its
 existing HTML, and deploys it to the `github-pages` environment. All directly
 invoked Actions are pinned to commit hashes. Native tar plus the pinned artifact
 uploader follows the Pages artifact format without a composite uploader's floating
