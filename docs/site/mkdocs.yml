@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-site_name: Living Proof Labs
+site_name: LivingProof
 site_url: https://docs.livingprooflabs.com/livingproof/
 use_directory_urls: false
 strict: true
 theme:
   name: zensical
   font: false
+  features:
+    - navigation.expand
   palette:
     - media: '(prefers-color-scheme)'
       toggle:

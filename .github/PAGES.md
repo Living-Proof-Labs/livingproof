@@ -47,7 +47,7 @@ For downloaded artifacts, follow the [HTTP preview instructions](../docs/verific
 Direct opening through Android `content://` providers may break sibling pages,
 styles or search even after full extraction; do not treat it as a missing build.
 
-After the independently reviewed change merges, use the deployment job's emitted
+For each independently reviewed update, use the deployment job's emitted
 `page_url` as the authoritative URL. The verified canonical project URL is
 `https://docs.livingprooflabs.com/livingproof/`. Verify the newly deployed revision
 there after each renderer change. Then:
@@ -62,7 +62,8 @@ there after each renderer change. Then:
 - Compare `build.json` and `feature-results.json` with the deployed run/commit.
 - Record the URL, run, commit, browser results and any failure in the PR. Add the
   verified URL prominently at the top of README and as the repository About
-  website/homepage. These final updates wait for actual URL verification.
+  website/homepage when its verified destination changes. The current README and
+  homepage already link the canonical manual.
 
 The one-day `github-pages` artifact is deployment staging. The existing review
 artifact has 14-day retention. Neither expiration removes the deployed manual:

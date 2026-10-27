@@ -1,11 +1,10 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-# Living Proof Labs
+# LivingProof
 
-**[Documentation: command reference, executable scenarios and verification](https://docs.livingprooflabs.com/livingproof/)**
+**[Start here: documentation](https://docs.livingprooflabs.com/livingproof/)**
 
-Living Proof Labs connects capability specifications to evidence and reviewable
-reports. `livingproof` is the project landing home and a thin, installable Click
-command. It delegates to explicitly installed plugins; it contains no reporting,
+LivingProof is the thin, installable umbrella command for discovering and using
+explicitly installed capability plugins. It contains no reporting,
 grading, robot execution or provider integration implementation.
 
 ## From a claim to a portable report
@@ -70,7 +69,8 @@ provider does not make its results compatible with an existing policy automatica
 Download versioned assets and `SHA256SUMS` from this repository's
 [Releases](https://github.com/Living-Proof-Labs/livingproof/releases).
 Choose one installation route; plugins must use the same Python environment as
-the root command. Nothing is downloaded or installed by the CLI at runtime.
+the root command. Ordinary commands never download or install plugins automatically. Explicit
+`plugins versions` and `plugins install` commands use the network as documented below.
 
 | Route | Root command | Reporter plugin |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ python3 -m venv .venv
 Use Python 3.11 or newer. Separate pipx environments cannot discover each other's
 plugins. The independently installed reporter command and Python library remain
 available; see the
-[reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.6.0/README.md).
+[reporter guide](https://docs.livingprooflabs.com/livingproof-capability-report/).
 
 ### Containers
 
