@@ -69,6 +69,43 @@ jobs:
         env:
           DOCS_URL: ${{ steps.documentation.outputs.artifact-url }}
         run: echo "[Generated documentation and scenario evidence]($DOCS_URL) — download, extract and open docs/html/index.html (14-day retention)." >> "$GITHUB_STEP_SUMMARY"
+      # Preview-only: the existing documentation artifact and Pages deployment stay unchanged.
+      - name: Set up Markdown comparison tooling
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task docs:comparison:setup
+      - name: Build Sphinx and Zensical previews from the same installed evidence
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task docs:compare
+      - name: Install the pinned Playwright Chromium browser
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: uv run --locked --no-sync --group docs-comparison playwright install --with-deps chromium
+      - name: Exercise preview navigation, search, themes and content
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task test:docs:comparison
+      - name: Publish measured comparison and case outcomes
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task docs:comparison:results >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: comparison
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && inputs.version == '0.0.0' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        with:
+          name: markdown-comparison-${{ inputs.version }}-${{ matrix.architecture }}
+          path: |
+            artifacts/docs-comparison/sphinx/site/
+            artifacts/docs-comparison/zensical/site/
+            artifacts/docs-comparison/common/
+            artifacts/docs-comparison/screenshots/
+            artifacts/docs-comparison/measurements.json
+            artifacts/docs-comparison/source-manifest.json
+            artifacts/docs-comparison/installed-commands.json
+            artifacts/docs-comparison/report.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Link comparison previews
+        if: ${{ !cancelled() && steps.comparison.outputs.artifact-url != '' }}
+        env:
+          PREVIEW_URL: ${{ steps.comparison.outputs.artifact-url }}
+        run: echo "[Sphinx and Zensical comparison previews]($PREVIEW_URL) — 14-day retention; serve the extracted artifact over loopback HTTP." >> "$GITHUB_STEP_SUMMARY"
       - name: Generate actual compatibility evidence
         if: ${{ !cancelled() }}
         run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"

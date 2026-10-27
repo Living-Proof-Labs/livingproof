@@ -37,6 +37,13 @@ dev = [
     "sphinx==8.2.3",
     "sphinx-click==6.2.0",
 ]
+docs-comparison = [
+    "furo==2025.12.19",
+    "mkdocs-click==0.9.0",
+    "myst-parser==5.1.0",
+    "playwright==1.64.1",
+    "zensical==0.0.73",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

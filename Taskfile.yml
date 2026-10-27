@@ -81,3 +81,19 @@ tasks:
     desc: Build browsable Click and scenario docs from packaged images and current results
     cmds:
       - uv run --locked --no-sync python tools/docs.py
+  docs:comparison:setup:
+    desc: Install the separately locked preview and browser-test tools
+    cmds:
+      - uv sync --locked --inexact --no-python-downloads --group docs-comparison
+  docs:compare:
+    desc: Build both Markdown previews from existing packaged docs evidence (no deployment)
+    cmds:
+      - uv run --locked --no-sync --group docs-comparison python tools/docs_comparison.py
+  test:docs:comparison:
+    desc: Exercise comparison links and real browser interactions with individual results
+    cmds:
+      - uv run --locked --no-sync --group docs-comparison pytest tests/docs --junitxml=artifacts/docs-comparison-tests.xml
+  docs:comparison:results:
+    desc: Publish measured preview build and individual browser-test outcomes
+    cmds:
+      - uv run --locked --no-sync --group docs-comparison python tools/docs_comparison_report.py
