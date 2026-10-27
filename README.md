@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Living Proof Labs
 
-**[Documentation: command reference, executable scenarios and verification](https://living-proof-labs.github.io/livingproof/)**
+**[Documentation: command reference, executable scenarios and verification](https://docs.livingprooflabs.com/livingproof/)**
 
 Living Proof Labs connects capability specifications to evidence and reviewable
 reports. `livingproof` is the project landing home and a thin, installable Click
