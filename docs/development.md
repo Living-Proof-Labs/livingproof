@@ -27,9 +27,10 @@ livingproof capability report --help
 livingproof capability report validate artifacts/reporter/source/examples/bundle/manifest.json
 ```
 
-This contributor task downloads and checksum-verifies reporter v1.4.0, then
-installs its wheel into the same development environment. It never runs implicitly
-when the CLI starts. `task setup` locks root/tool dependencies while retaining
+This contributor task downloads and checksum-verifies the reporter release pinned
+in `reporter-release.txt`, then installs its wheel into the same development
+environment. It never runs implicitly when the CLI starts. `task setup` locks
+root/tool dependencies while retaining
 explicitly installed plugins (`uv sync --inexact`); rebuilding a fresh container
 requires opting into the plugin again. These are development instructions;
 Debian consumers install both `.deb` files with apt as described in the README.
