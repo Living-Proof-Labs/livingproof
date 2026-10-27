@@ -323,11 +323,11 @@ def test_task_reference_matches_actual_taskfile(output):
     import subprocess
     metadata = json.loads((output / 'html/task-reference.json').read_text())
     assert metadata['taskfile_sha256'] == hashlib.sha256((ROOT / 'Taskfile.yml').read_bytes()).hexdigest()
-    tasks = json.loads(subprocess.check_output(['task', '--list', '--json'], cwd=ROOT, text=True))['tasks']
+    tasks = json.loads(subprocess.check_output(['task', '--color=false', '--list', '--json'], cwd=ROOT, text=True))['tasks']
     assert metadata['tasks'] == [task['name'] for task in tasks]
     source = (output / 'source/tasks.md').read_text()
     for task in tasks:
-        summary = subprocess.check_output(['task', '--summary', task['name']], cwd=ROOT, text=True)
+        summary = subprocess.check_output(['task', '--color=false', '--summary', task['name']], cwd=ROOT, text=True)
         assert summary.rstrip() in source
 
 
@@ -370,3 +370,32 @@ def test_organization_narrative_bookmarks_forward(browser, server, anchor):
     expect(article(page).get_by_role('link', name='organization vision', exact=True)).to_have_attribute(
         'href', 'https://docs.livingprooflabs.com/vision.html')
     page.close()
+
+
+def test_task_capture_disables_forced_terminal_color(output, tmp_path, monkeypatch):
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from docs_portal import task_reference
+    import subprocess
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    monkeypatch.setenv('TERM', 'xterm-256color')
+    monkeypatch.setenv('FORCE_COLOR', '1')
+    monkeypatch.setenv('CLICOLOR_FORCE', '1')
+    monkeypatch.setenv('TASK_COLOR', 'true')
+    control = subprocess.check_output(['task', '--summary', 'docs'], cwd=ROOT, text=True)
+    assert re.search(r'\x1b|\x9b|\[[0-9;]*m', control)
+    task_reference(ROOT, tmp_path)
+    text = (tmp_path / 'tasks.md').read_text()
+    assert 'uv run --locked --no-sync python tools/docs.py' in text
+    assert 'docker compose build development' in text
+    assert not re.search(r'\x1b|\x9b|\[[0-9;]*m', text)
+    rendered = ' '.join(Document((output / 'html/tasks.html').read_text()).text)
+    assert 'uv run --locked --no-sync python tools/docs.py' in rendered
+    assert not re.search(r'\x1b|\x9b|\[[0-9;]*m', rendered)
+
+
+def test_contribution_baseline_matches_working_agreement(output):
+    target = 'https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v6.0.0'
+    html = (output / 'html/index.html').read_text()
+    assert f'<a href="{target}">collaboration-guidelines v6.0.0</a>' in html
+    assert 'collaboration-guidelines/blob/v6.0.0/AGENTS.md' in (ROOT / 'AGENTS.md').read_text()

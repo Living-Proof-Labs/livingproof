@@ -209,7 +209,7 @@ and [Click's completion protocol](https://click.palletsprojects.com/en/stable/sh
 
 Use [the contributor guide](docs/development.md) for Docker, devcontainer, Task,
 installed smoke tests and release handling. The pinned shared baseline is
-[collaboration-guidelines v4.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v4.0.0).
+[collaboration-guidelines v6.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v6.0.0).
 Read [the plugin contract](docs/plugins.md) before adding a plugin. Keep the root
 small and link versioned ecosystem documentation rather than copying it here.
 
