@@ -7,8 +7,13 @@ import sys
 
 def assemble(directory):
     directory = Path(directory)
-    patterns = ('*.whl', 'livingproof-*.tar.gz', '*.deb', 'compatibility-*.json',
+    patterns = ('*.whl', '*.tar.gz', '*.deb', 'compatibility-*.json',
                 'compatibility-*.md', 'registry-*.json', 'registry-*.md')
+    for pattern in ('livingproof-*-py3-none-any.whl', 'livingproof-*.tar.gz',
+                    'livingproof_*_all.deb', 'livingproof_common-*-py3-none-any.whl',
+                    'python3-livingproof-common_*_all.deb'):
+        if len(list(directory.glob(pattern))) != 1:
+            raise ValueError(f'Expected exactly one required package: {pattern}')
     assets = []
     for pattern in patterns:
         matches = sorted(directory.glob(pattern))

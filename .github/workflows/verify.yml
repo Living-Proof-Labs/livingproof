@@ -281,7 +281,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -298,6 +302,10 @@ jobs:
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
         with:
           version: '3.54.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: packages-${{ needs.release.outputs.version }}-${{ matrix.architecture }}
+          path: dist
       - run: task setup
       - run: uv run --locked --no-sync python tools/fetch_reporter.py
       - run: uv run --locked --no-sync pytest tests/registry --junitxml=artifacts/registry-tests.xml

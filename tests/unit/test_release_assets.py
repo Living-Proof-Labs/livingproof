@@ -48,3 +48,15 @@ def test_registry_verification_gates_publication_without_permission_expansion():
     packages = (ROOT / '.github/workflows/packages.yml').read_text()
     assert 'path: dist/' in packages
     assert 'retention-days: 14' in packages
+
+
+@pytest.mark.parametrize("missing", ["livingproof_common-1.0.0-py3-none-any.whl",
+                                     "python3-livingproof-common_1.0.0_all.deb"])
+def test_common_packages_are_required_individually(tmp_path, missing):
+    for name in ('livingproof-1.0.0-py3-none-any.whl', 'livingproof-1.0.0.tar.gz',
+                 'livingproof_1.0.0_all.deb', 'livingproof_common-1.0.0-py3-none-any.whl',
+                 'python3-livingproof-common_1.0.0_all.deb'):
+        if name != missing:
+            (tmp_path / name).touch()
+    with pytest.raises(ValueError, match='required package'):
+        module.assemble(tmp_path)
