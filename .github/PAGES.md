@@ -43,6 +43,10 @@ request. No org-wide permission change is needed.
 
 ## Public URL and actual live verification
 
+For downloaded artifacts, follow the [HTTP preview instructions](../docs/verification.md#preview-a-downloaded-manual).
+Direct opening through Android `content://` providers may break sibling pages,
+styles or search even after full extraction; do not treat it as a missing build.
+
 After the independently reviewed change merges, use the deployment job's emitted
 `page_url` as the authoritative URL. The expected default project URL is
 `https://living-proof-labs.github.io/livingproof/`; it is not a verified live link
