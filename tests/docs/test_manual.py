@@ -140,7 +140,7 @@ def test_navigation_and_internal_guide_links(browser, server, output, width):
     page.goto(f'{server}/')
     if width == 390:
         page.locator('label.md-header__button[for="__drawer"]:visible').first.click()
-    page.get_by_role('link', name='Command reference', exact=True).first.click()
+    page.get_by_role('link', name='Commands', exact=True).first.click()
     expect(article(page)).to_contain_text('livingproof capability report')
     expect(article(page)).to_contain_text('validate')
     page.goto(f'{server}/guides/development.html')
@@ -256,7 +256,7 @@ def test_command_fragments_and_assets_in_browser(browser, server):
 def test_canonical_url_and_internal_home_link(output):
     html = (output / 'html/index.html').read_text()
     assert '<link rel="canonical" href="https://docs.livingprooflabs.com/livingproof/index.html">' in html
-    match = re.search(r'<a href="([^"]+)">Documentation: command reference', html)
+    match = re.search(r'<a href="([^"]+)">Start here: documentation', html)
     assert match and match[1] in ('.', './', 'index.html'), match
 
 
@@ -316,4 +316,57 @@ def test_legacy_guide_bookmarks(browser, server, path, anchor, expected):
     expect(page.locator(f'#{anchor}')).to_be_attached()
     assert page.locator(f'#{anchor}').evaluate('e => Math.abs(e.getBoundingClientRect().top) < innerHeight')
     expect(article(page)).to_contain_text(expected)
+    page.close()
+
+
+def test_task_reference_matches_actual_taskfile(output):
+    import subprocess
+    metadata = json.loads((output / 'html/task-reference.json').read_text())
+    assert metadata['taskfile_sha256'] == hashlib.sha256((ROOT / 'Taskfile.yml').read_bytes()).hexdigest()
+    tasks = json.loads(subprocess.check_output(['task', '--list', '--json'], cwd=ROOT, text=True))['tasks']
+    assert metadata['tasks'] == [task['name'] for task in tasks]
+    source = (output / 'source/tasks.md').read_text()
+    for task in tasks:
+        summary = subprocess.check_output(['task', '--summary', task['name']], cwd=ROOT, text=True)
+        assert summary.rstrip() in source
+
+
+@pytest.mark.parametrize('width', [1280, 390], ids=['desktop', 'mobile'])
+def test_shared_navigation_identity_and_keyboard(browser, server, output, width):
+    context = browser.new_context(viewport={'width': width, 'height': 844})
+    page = context.new_page()
+    page.goto(f'{server}/guides/development.html')
+    footer = page.get_by_role('navigation', name='Manual identity')
+    expect(footer.get_by_role('link', name='Documentation home')).to_have_attribute(
+        'href', 'https://docs.livingprooflabs.com/')
+    build = json.loads((output / 'html/build.json').read_text())
+    identity = footer.get_by_role('link', name=re.compile('Docs: development'))
+    expect(identity).to_have_attribute('href', build['source_url'])
+    expect(identity).to_contain_text(build['source_commit'][:7])
+    version = footer.get_by_role('link', name='Version and source')
+    version.focus()
+    page.keyboard.press('Enter')
+    expect(page).to_have_url(f'{server}/provenance.html')
+    expect(article(page)).to_contain_text('Historical rendered manuals are not maintained')
+    page.goto(f'{server}/tasks.html#docs')
+    page.reload()
+    expect(page.locator('#docs')).to_be_visible()
+    expect(article(page)).to_contain_text('uv run --locked --no-sync python tools/docs.py')
+    context.close()
+
+
+@pytest.mark.parametrize('anchor', [
+    'from-a-claim-to-a-portable-report', 'what-exists-and-what-is-planned',
+    'candidate-evaluator-integrations',
+])
+def test_organization_narrative_bookmarks_forward(browser, server, anchor):
+    page = browser.new_page()
+    page.goto(f'{server}/index.html#{anchor}')
+    expect(page.locator(f'#{anchor}')).to_be_visible()
+    page.reload()
+    expect(page.locator(f'#{anchor}')).to_be_visible()
+    expect(article(page).get_by_role('link', name='published manual directory')).to_have_attribute(
+        'href', 'https://docs.livingprooflabs.com/#published-manuals')
+    expect(article(page).get_by_role('link', name='organization vision', exact=True)).to_have_attribute(
+        'href', 'https://docs.livingprooflabs.com/vision.html')
     page.close()

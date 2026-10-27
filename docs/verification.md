@@ -85,7 +85,8 @@ navigation/search even when the full artifact is present. Opening `commands.html
 directly can help diagnose this; it does not establish that navigation or search
 works. The reported Android behavior has not been confirmed fixed.
 
-Prefer the verified hosted manual once deployed (see [Pages publication](../.github/PAGES.md)).
+Prefer the [hosted manual](https://docs.livingprooflabs.com/livingproof/).
+See [Pages publication](../.github/PAGES.md) for deployment and verification details.
 For a local preview on a computer with Python 3 and a browser, run this from the
 extracted artifact directory:
 

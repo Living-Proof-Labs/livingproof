@@ -44,7 +44,8 @@ def preserve_urls(site):
                         '<a href="terminal-help.html">Installed terminal help</a></p>' + end)
     page.write_text(html)
     for filename, old, current in (
-            ('index.html', 'living-proof-labs-command-home', 'living-proof-labs'),
+            ('index.html', 'living-proof-labs', 'livingproof'),
+            ('index.html', 'living-proof-labs-command-home', 'livingproof'),
             ('scenarios.html', 'executable-user-journeys', 'executable-scenarios')):
         page = site / filename
         html, count = re.subn(rf'(<h1 id="{current}">)',

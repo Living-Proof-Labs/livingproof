@@ -1,76 +1,38 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-# Living Proof Labs
+# LivingProof
 
-**[Documentation: command reference, executable scenarios and verification](https://docs.livingprooflabs.com/livingproof/)**
+**[Start here: documentation](https://docs.livingprooflabs.com/livingproof/)**
 
-Living Proof Labs connects capability specifications to evidence and reviewable
-reports. `livingproof` is the project landing home and a thin, installable Click
-command. It delegates to explicitly installed plugins; it contains no reporting,
+LivingProof is the thin, installable umbrella command for discovering and using
+explicitly installed capability plugins. It contains no reporting,
 grading, robot execution or provider integration implementation.
 
 ## From a claim to a portable report
 
-**Versioned specs → execution and evidence → evaluator assessments →
-versioned policy-based grade → portable report.**
-
-1. Author and manage capability specifications in
-   [robot-capability-specs v1.2.0](https://github.com/Living-Proof-Labs/robot-capability-specs/tree/v1.2.0).
-   That repository owns specs, not a general execution platform.
-2. Execute a scenario and retain its context, original producer result and evidence.
-   [capability-verifier v1.1.2](https://github.com/Living-Proof-Labs/capability-verifier/tree/v1.1.2)
-   provides the existing fixture workflow. Real robot and simulator adapters are future work.
-3. Record evaluator assessments against the exact spec and evidence. Deterministic
-   checks, AI assessments and human review remain distinct. An assessment may
-   propose a grade; disagreements, rationale and provenance must stay visible.
-4. Apply an explicit, versioned grading policy to decide the final grade. A model's
-   proposed grade is an input, not authority to silently replace that policy.
-5. Produce a portable report with the existing
-   [capability reporter v1.6.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/tree/v1.6.0).
-   It validates bundles, grades with its supported policy, and renders saved decisions
-   as terminal tables, JSON, HTML or CSV. Evidence stays in the bundle. Rendering
-   does not regrade. These fixture demonstrations do not establish robot safety certification.
+The organization owns the [vision and evidence workflow](https://docs.livingprooflabs.com/vision.html#from-a-requirement-to-the-next-improvement).
+LivingProof provides the umbrella command and explicit plugin lifecycle; installed
+plugins own their reporting, grading and execution behavior.
 
 ## What exists and what is planned
 
-| Area | Status |
-| --- | --- |
-| Specs, deterministic fixtures, mock AI and recorded human fixture assessments | Existing versioned ecosystem repositories linked above |
-| Bundle validation, policy grading, portable reporting and standalone reporting library/CLI | Implemented by reporter v1.6.0 |
-| Thin root command and installed Click plugin discovery | Implemented; wheel, source, Debian and native container distributions use the shared release workflow |
-| Reporter plugin registration | Implemented by reporter v1.6.0; its standalone command and library remain independent |
-| Real evaluator/provider integrations and robot/simulator adapters | Candidate designs only; no credentials, model calls or adapters delivered here |
-
-Full MCAP recordings may be evidence inputs. A future adapter may extract signals,
-frames or summaries for an evaluator while preserving links to original evidence.
-Not every provider accepts MCAP directly. Input support, execution interfaces,
-retention and provenance must be established separately for each integration.
+Use the [published manual directory](https://docs.livingprooflabs.com/#published-manuals)
+to find each product's current behavior and limits. This repository implements
+command discovery, plugin lifecycle and completion; it does not implement robot
+execution or evaluator integrations.
 
 ### Candidate evaluator integrations
 
-These are candidates for future evaluator implementations, not delivered plugins,
-endorsements or interchangeable execution APIs. Official product descriptions
-were reviewed on 2026-10-25:
-
-| Candidate | Relevant documented capability | Proposed role |
-| --- | --- | --- |
-| [Roboto](https://www.roboto.ai/platform/) | Robotics data analytics, Actions and AI log analysis; MCAP support | Robotics/log evidence assessments |
-| [Foxglove Agents](https://docs.foxglove.dev/docs/agents) | Agents and MCP for investigating robot data | Robotics/log evidence assessments |
-| [OpenAI ChatGPT](https://help.openai.com/en/articles/8437071-data-analysis-with-chatgpt) / [Codex](https://openai.com/codex/) | File/data analysis in ChatGPT; coding agent workflows in Codex | Candidate provider/agent-assisted evaluation workflows, with separate integration designs |
-| [Google Gemini](https://ai.google.dev/gemini-api/docs/document-processing) | Document understanding through its API | Assessments over supported representations of evidence |
-| [Cursor](https://cursor.com/docs/agent/overview) | Coding agent with file, search and terminal tools | Agent-assisted evaluator development and execution workflows |
-
-An adapter must record evaluator and model versions where available, inputs,
-transformations, rationale and execution provenance. Preserve deterministic checks
-and human reviews alongside AI assessments, including contradictions. The current
-reporter's supported evaluator/policy set is deliberately narrow: recording a new
-provider does not make its results compatible with an existing policy automatically.
+Integration direction belongs to the [organization vision](https://docs.livingprooflabs.com/vision.html).
+Candidate integrations are not delivered LivingProof plugins or evidence of
+robot safety certification. Product contracts remain with their implementers.
 
 ## Get started
 
 Download versioned assets and `SHA256SUMS` from this repository's
 [Releases](https://github.com/Living-Proof-Labs/livingproof/releases).
 Choose one installation route; plugins must use the same Python environment as
-the root command. Nothing is downloaded or installed by the CLI at runtime.
+the root command. Ordinary commands never download or install plugins automatically. Explicit
+`plugins versions` and `plugins install` commands use the network as documented below.
 
 | Route | Root command | Reporter plugin |
 | --- | --- | --- |
@@ -120,7 +82,7 @@ python3 -m venv .venv
 Use Python 3.11 or newer. Separate pipx environments cannot discover each other's
 plugins. The independently installed reporter command and Python library remain
 available; see the
-[reporter guide](https://github.com/Living-Proof-Labs/livingproof-capability-report/blob/v1.6.0/README.md).
+[reporter guide](https://docs.livingprooflabs.com/livingproof-capability-report/).
 
 ### Containers
 

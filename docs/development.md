@@ -108,8 +108,10 @@ the PR. It is removed before the green merge. Historical trend dashboards are no
 claimed. Compatibility JSON/Markdown is generated from actual runtime probes;
 missing probes are NOT_COMPLETED and failed cases remain FAIL.
 
-The shared baseline and release engine are pinned to
-[collaboration-guidelines v4.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v4.0.0).
+The adopted shared baseline is
+[collaboration-guidelines v6.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v6.0.0).
+The release engine remains pinned independently to v4.0.0; documentation adoption
+does not upgrade executable release workflows.
 The host orchestration suite uses the same locked Python tools because it must
 control native Docker; app setup/tests/builds also run in the shared development
 image. Release details are in [release operation](../.github/RELEASE.md).

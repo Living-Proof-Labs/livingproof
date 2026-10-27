@@ -15,6 +15,7 @@ import yaml
 
 from feature_results import ROOT, results, scenarios
 from docs_compatibility import preserve_urls
+from docs_portal import task_reference, add_identity
 
 OUTPUT = ROOT / 'artifacts/docs'
 # Explicit source allowlist: no source checkout is exposed as a web root.
@@ -30,14 +31,21 @@ SOURCES = {
     'docs/decisions/zensical.md': 'maintainers/docs-decision.md',
 }
 NAV = [
-    ('Home', 'index.md'), ('Command reference', 'commands.md'),
-    ('Installed terminal help', 'terminal-help.md'), ('Executable scenarios', 'scenarios.md'),
-    ('Build provenance', 'provenance.md'),
-    ('Plugin contract', 'guides/plugins.md'), ('Development', 'guides/development.md'),
-    ('Verification and previews', 'guides/verification.md'),
-    ('Pages publication', 'maintainers/pages.md'), ('Release operation', 'maintainers/releases.md'),
-    ('Documentation decision', 'maintainers/docs-decision.md'),
-    ('Working agreement', 'maintainers/working-agreement.md'), ('Licensing', 'license.md'),
+    {'Documentation home': 'https://docs.livingprooflabs.com/'},
+    {'Start here': 'index.md'},
+    {'Guides': [{'Installation and quickstart': 'index.md'},
+                {'Plugin contract': 'guides/plugins.md'}]},
+    {'Reference': [{'Commands': 'commands.md'}, {'Terminal help': 'terminal-help.md'},
+                   {'Tasks': 'tasks.md'}]},
+    {'Scenarios and results': 'scenarios.md'},
+    {'Verification': 'guides/verification.md'},
+    {'Contribute': [{'Development': 'guides/development.md'},
+                    {'Working agreement': 'maintainers/working-agreement.md'}]},
+    {'Version and source': 'provenance.md'},
+    {'Maintainers': [{'Pages publication': 'maintainers/pages.md'},
+                     {'Release operation': 'maintainers/releases.md'},
+                     {'Documentation decision': 'maintainers/docs-decision.md'}]},
+    {'License': 'license.md'},
 ]
 
 
@@ -107,11 +115,17 @@ def stage():
         f"[Source revision]({provenance['source_url']})\n\n"
         + (f"[Verification run]({provenance['workflow_run']})\n\n"
            if provenance['workflow_run'] else 'Local snapshot; no hosted verification run.\n\n')
+        + 'This is the current development manual, not a stable package release manual.\n'
+        + 'Historical rendered manuals are not maintained; consult [source release tags](https://github.com/Living-Proof-Labs/livingproof/tags).\n'
+        + 'Review artifacts expire after 14 days; that does not remove the hosted manual.\n'
+        + '[Published package releases](https://github.com/Living-Proof-Labs/livingproof/releases) are separate from this documentation revision and candidate metadata.\n'
+        + 'No line coverage is measured by this manual, and no private security reporting route is established here.\n\n'
         + '```json\n' + json.dumps(provenance, indent=2) + '\n```\n\n'
         + '[Build record](build.json) | [Scenario outcomes](feature-results.json)\n')
     (OUTPUT / 'source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     for page in ('commands.md', 'search.md'):
         shutil.copyfile(ROOT / 'docs/site' / page, common / page)
+    task_reference(ROOT, common)
     return common
 
 
@@ -191,12 +205,13 @@ print(json.dumps(walk(main, 'livingproof')))
     (OUTPUT / 'installed-commands.json').write_text(commands)
     config = yaml.safe_load((ROOT / 'docs/site/mkdocs.yml').read_text())
     config.update(docs_dir='source', site_dir='html',
-                  nav=[{label: path} for label, path in NAV])
+                  nav=NAV)
     config_file = OUTPUT / 'mkdocs.yml'
     config_file.write_text(yaml.safe_dump(config, sort_keys=False))
     subprocess.run([sys.executable, '-m', 'zensical', 'build', '--clean', '-f', str(config_file)],
                    env=env, cwd=OUTPUT, check=True)
     preserve_urls(OUTPUT / 'html')
+    add_identity(OUTPUT / 'html')
     print(f'Preview {OUTPUT}/html over loopback HTTP; see docs/verification.md')
 
 
