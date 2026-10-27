@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import tarfile
@@ -29,12 +30,11 @@ def anonymous_docker_config():
 @pytest.mark.parametrize("suffix,mode", [("", "root"), ("-reporting", "combined")])
 def test_anonymous_native_registry(suffix, mode):
     image = f"ghcr.io/living-proof-labs/livingproof:{os.environ['VERSION']}{suffix}"
-    subprocess.run(["docker", "pull", image], check=True)
+    pulled = subprocess.check_output(["docker", "pull", image], text=True)
+    print(pulled)
     tagged = image
-    digests = json.loads(subprocess.check_output(
-        ["docker", "image", "inspect", image, "--format", "{{json .RepoDigests}}"], text=True))
-    image, = [digest for digest in digests
-              if digest.startswith("ghcr.io/living-proof-labs/livingproof@sha256:")]
+    digest, = re.findall(r"^Digest: (sha256:[0-9a-f]{64})$", pulled, re.MULTILINE)
+    image = f"ghcr.io/living-proof-labs/livingproof@{digest}"
     subprocess.run(["docker", "pull", image], check=True)
     version = subprocess.check_output(["docker", "run", "--rm", image, "--version"], text=True)
     assert version.splitlines()[0] == f"livingproof, version {os.environ['VERSION']}"
