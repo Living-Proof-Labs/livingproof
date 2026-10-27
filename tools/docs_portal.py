@@ -10,7 +10,7 @@ import subprocess
 def task_reference(root, source):
     # Only this reviewed repository Taskfile; listing can evaluate dynamic variables.
     tasks = json.loads(subprocess.check_output(
-        ['task', '--list', '--json'], cwd=root, text=True))['tasks']
+        ['task', '--color=false', '--list', '--json'], cwd=root, text=True))['tasks']
     digest = hashlib.sha256((root / 'Taskfile.yml').read_bytes()).hexdigest()
     lines = ['# Contributor tasks', '',
              'Generated from the reviewed Taskfile using Task --list --json and --summary.', '',
@@ -21,7 +21,7 @@ def task_reference(root, source):
              f'Taskfile SHA-256: `{digest}`', '']
     for task in tasks:
         name = task['name']
-        summary = subprocess.check_output(['task', '--summary', name], cwd=root, text=True)
+        summary = subprocess.check_output(['task', '--color=false', '--summary', name], cwd=root, text=True)
         lines += [f'## {name}', '', '```text', summary.rstrip(), '```', '']
     (source / 'tasks.md').write_text('\n'.join(lines))
     (source / 'task-reference.json').write_text(json.dumps(
