@@ -41,6 +41,74 @@ jobs:
         with:
           name: devcontainer-tests
           path: artifacts/devcontainer-tests.xml
+  documentation:
+    needs: [verify, development]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check current main inside the deployment lock
+        id: freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GIT_TERMINAL_PROMPT=0
+          main_ref=$(timeout 30s git -c credential.helper= ls-remote --exit-code "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main)
+          if [[ ! "$main_ref" =~ ^([0-9a-f]{40})[[:space:]]refs/heads/main$ ]]; then
+            echo "::error::Cannot determine the current main commit; refusing publication."
+            exit 1
+          fi
+          current_main="${BASH_REMATCH[1]}"
+          if [[ "$current_main" == "$GITHUB_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale documentation run $GITHUB_SHA; main is $current_main." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # Same run/commit as the successful verification jobs; never a PR artifact.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: steps.freshness.outputs.current == 'true'
+        with:
+          name: documentation-0.0.0-amd64
+          path: documentation
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        if: steps.freshness.outputs.current == 'true'
+      - name: Package the verified HTML for Pages
+        if: steps.freshness.outputs.current == 'true'
+        run: |
+          test -f documentation/docs/html/index.html
+          test -f documentation/docs/html/build.json
+          test -f documentation/docs/html/feature-results.json
+          python - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          site = Path('documentation/docs/html')
+          provenance = json.loads((site / 'build.json').read_text())
+          assert provenance['source_commit'] == os.environ['GITHUB_SHA']
+          assert provenance['source_dirty'] is False
+          outcomes = json.loads((site / 'feature-results.json').read_text())
+          assert outcomes and all(row['status'] == 'PASS' for row in outcomes)
+          PYTHON
+          tar --dereference --hard-dereference -C documentation/docs/html -cf "$RUNNER_TEMP/artifact.tar" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.freshness.outputs.current == 'true'
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+      - name: Deploy the verified documentation
+        if: steps.freshness.outputs.current == 'true'
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
   release:
     needs: [verify, development]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

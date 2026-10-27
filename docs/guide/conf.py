@@ -9,3 +9,5 @@ html_theme_options = {
     "github_repo": "livingproof",
     "github_button": True,
 }
+
+html_extra_path = ['build.json', 'feature-results.json']
