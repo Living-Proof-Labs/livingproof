@@ -127,7 +127,7 @@ jobs:
     with:
       version: ${{ needs.release.outputs.version }}
   publish:
-    needs: [release, assets]
+    needs: [release, assets, registry-consumption]
     if: needs.release.outputs.draft-created == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -135,6 +135,9 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: packages-${{ needs.release.outputs.version }}-amd64
@@ -151,15 +154,25 @@ jobs:
         with:
           name: consumed-${{ needs.release.outputs.version }}-arm64
           path: release-assets
-      - name: Assemble checksums and all tested native images
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: registry-evidence-*
+          path: release-assets
+          merge-multiple: true
+      - name: Assemble checksums for public packages and evidence
         run: |
-          cp arm/image-arm64.tar arm/reporting-image-arm64.tar release-assets/
-          cat release-assets/SHA256SUMS-amd64 release-assets/SHA256SUMS-arm64 > release-assets/SHA256SUMS
-          (cd release-assets && sha256sum -c SHA256SUMS)
+          python tools/release_assets.py release-assets
       - name: Attach all assets before publication
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE_TAG" release-assets/*.whl release-assets/*.tar.gz release-assets/*.tar release-assets/*.deb release-assets/compatibility-*.json release-assets/compatibility-*.md release-assets/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+        run: gh release upload "$RELEASE_TAG" release-assets/*.whl release-assets/*.tar.gz release-assets/*.deb release-assets/compatibility-*.json release-assets/compatibility-*.md release-assets/registry-*.json release-assets/registry-*.md release-assets/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+      - name: Append verified digest-pinned container instructions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$RELEASE_TAG" --json body --jq .body --repo "$GITHUB_REPOSITORY" > notes.md
+          cat release-assets/registry-*.md >> notes.md
+          gh release edit "$RELEASE_TAG" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
       - name: Publish the tested draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,7 +209,7 @@ jobs:
         run: |
           mkdir dist
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-          for name in SHA256SUMS "livingproof_common-1.0.0-py3-none-any.whl" "python3-livingproof-common_1.0.0_all.deb" "livingproof-${VERSION}-py3-none-any.whl" "livingproof-${VERSION}.tar.gz" "livingproof_${VERSION}_all.deb" "image-${{ matrix.architecture }}.tar" "reporting-image-${{ matrix.architecture }}.tar"; do
+          for name in SHA256SUMS "livingproof_common-1.0.0-py3-none-any.whl" "python3-livingproof-common_1.0.0_all.deb" "livingproof-${VERSION}-py3-none-any.whl" "livingproof-${VERSION}.tar.gz" "livingproof_${VERSION}_all.deb" "registry-${{ matrix.architecture }}.json"; do
             curl --retry 3 -fsSL "$base/$name" -o "dist/$name"
           done
           (cd dist && sha256sum --ignore-missing -c SHA256SUMS)
@@ -204,6 +217,7 @@ jobs:
       - run: uv run --locked --no-sync python tools/fetch_reporter.py --distributions
       - run: task test:installed
         env:
+          REGISTRY_IMAGES: "true"
           LIVINGPROOF_GITHUB_TOKEN: ${{ github.token }}
       - uses: ./.github/actions/test-results
         if: ${{ !cancelled() }}
@@ -211,7 +225,7 @@ jobs:
           name: public-consumer-tests-${{ matrix.architecture }}
           path: artifacts/installed-tests.xml
   registry:
-    needs: [release, consume-public]
+    needs: [release, assets]
     if: needs.release.outputs.draft-created == 'true'
     strategy:
       fail-fast: false
@@ -287,6 +301,12 @@ jobs:
       - run: task setup
       - run: uv run --locked --no-sync python tools/fetch_reporter.py
       - run: uv run --locked --no-sync pytest tests/registry --junitxml=artifacts/registry-tests.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: registry-evidence-${{ matrix.runner }}
+          path: artifacts/registry-*
+          if-no-files-found: error
+          retention-days: 14
       - uses: ./.github/actions/test-results
         if: ${{ !cancelled() }}
         with:

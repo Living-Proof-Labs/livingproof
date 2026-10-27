@@ -11,21 +11,27 @@ The same candidate Debian asset built on amd64 is consumed on both CPUs with the
 published reporter `.deb` in Debian 12, Debian 13 and Ubuntu 24.04. Pytest cases
 are ingested into GitHub Checks; the actual devcontainer lifecycle is a separate
 gate. Verification must pass before the shared semantic-release workflow at
-v4.0.0 creates a draft. Release-version packages are rebuilt and tested, all assets
-and generated compatibility evidence are attached, and then the draft is published.
+v4.0.0 creates a draft. Release-version packages are rebuilt and tested. The same
+saved images are transferred through 14-day CI artifacts, pushed with the existing
+workflow token, and combined into version-specific root/reporting manifests.
+Fresh native amd64 and arm64 runners use empty Docker credential configurations
+to pull immutable registry digests and exercise installed packages and entrypoints.
+Publication depends on both registry-consumption jobs succeeding.
 
-Fresh native runners anonymously download the published package and image assets,
-verify checksums, load saved images, and repeat installed-consumer tests. Only then
-are the same saved images pushed to the version-specific registry tags and combined
-into root/reporting multi-architecture manifests. Separate fresh native tests
-verify anonymous registry pulls. Saved images provide a release distribution even
-if registry access is blocked; do not call an unverified registry tag available.
+Only wheels, source archives, Debian packages, compatibility reports, registry
+identity/run instructions and their checksums are attached to routine releases.
+Release notes include the verified digests, platforms and copy/paste commands.
+Public package consumption subsequently repeats the installed tests, fetching
+containers through those digest references instead of public archive attachments.
+Internal CI image archives remain available for exact build/test/publish transfers.
+Offline image exports are an explicit consumer operation, not routine duplication.
 
 Use only the existing workflow token. Do not change package visibility, Actions
 access, security settings or grants to recover a failed registry step without
-exact approval. Report the exact package/repository and failed operation. Successful
-asset publication is a real release even if a subsequent registry step fails;
-report that distinction and retry only the failed jobs after the blocker is resolved.
+exact approval. Report the exact package/repository and failed operation. Registry
+failure leaves the release draft unpublished; inspect the failed jobs and existing
+registry tags before recovery. Do not delete existing releases, assets, manifests
+or layers. Candidate artifact expiry does not authorize registry cleanup.
 
 A failed prepublication build leaves a draft. Inspect it before recovery, reuse it,
 and never retarget published tags or overwrite public assets. Generated release

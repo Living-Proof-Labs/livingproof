@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Native installed-consumer tests with individual visible CI results."""
+import json
 import os
 from pathlib import Path
 import platform
@@ -57,8 +58,12 @@ def docker():
 @pytest.mark.parametrize("variant,mode", [("", "root"), ("-reporting", "combined")])
 def test_saved_container(variant, mode):
     filename = "reporting-image" if variant else "image"
-    run(["docker", "load", "-i", str(ROOT / f"dist/{filename}-{ARCH}.tar")])
-    image = f"ghcr.io/living-proof-labs/livingproof:{VERSION}{variant}-{ARCH}"
+    if os.environ.get("REGISTRY_IMAGES") == "true":
+        image = json.loads((ROOT / f"dist/registry-{ARCH}.json").read_text())[mode]["image"]
+        run(["docker", "pull", image])
+    else:
+        run(["docker", "load", "-i", str(ROOT / f"dist/{filename}-{ARCH}.tar")])
+        image = f"ghcr.io/living-proof-labs/livingproof:{VERSION}{variant}-{ARCH}"
     assert "capability" in run([*docker(), image, "--help"])
     if variant:
         run([*docker(), image, "capability", "report", "validate", "/input/manifest.json"])
