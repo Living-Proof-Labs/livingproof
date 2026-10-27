@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Living Proof Labs
 
+**[Documentation: command reference, executable scenarios and verification](docs/verification.md)**
+
 Living Proof Labs connects capability specifications to evidence and reviewable
 reports. `livingproof` is the project landing home and a thin, installable Click
 command. It delegates to explicitly installed plugins; it contains no reporting,

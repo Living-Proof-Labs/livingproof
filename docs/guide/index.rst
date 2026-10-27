@@ -9,6 +9,7 @@ Discover optional installed capabilities, then use their commands through
 
    commands
    scenarios
+   provenance
 
 `Project and installation instructions <https://github.com/Living-Proof-Labs/livingproof>`_
 | `Plugin contract <https://github.com/Living-Proof-Labs/livingproof/blob/main/docs/plugins.md>`_

@@ -57,9 +57,9 @@ is attempted after failure and cannot turn them green.
 `documentation-VERSION-ARCHITECTURE` contains `docs/html/index.html` and the feature
 JSON/Markdown map. Download and extract it, then open the HTML index. CI links the
 artifact in the run summary; retention is 14 days, matching test evidence.
-This is a browsable offline artifact, not an enabled Pages site. No hosting,
-security settings or additional workflow permissions are introduced. Fork token
-limitations remain those documented in [development](development.md).
+The downloadable artifact remains available independently of the hosted manual.
+Fork token limitations remain those documented in [development](development.md).
+See [Pages publication and live verification](../.github/PAGES.md).
 
 ## Independent review and limits
 

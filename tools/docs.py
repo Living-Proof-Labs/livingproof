@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Build navigable Sphinx HTML from installed Click definitions and real scenarios."""
+import hashlib
+import json
 import os
 from pathlib import Path
 import platform
@@ -58,6 +60,35 @@ def build():
             helps += ['   ' + line for line in help_text.splitlines()]
             helps += ['']
     (guide / 'generated-help.rst').write_text(':orphan:\n\n' + '\n'.join(helps))
+    # Preserve a small, explicit provenance record alongside the public manual.
+    commit = run(['git', 'rev-parse', 'HEAD'], cwd=ROOT).strip()
+    repository = 'Living-Proof-Labs/livingproof'
+    provenance = {
+        'source_commit': commit,
+        'source_dirty': bool(run(['git', 'status', '--porcelain'], cwd=ROOT).strip()),
+        'source_url': f'https://github.com/{repository}/tree/{commit}',
+        'workflow_run': (f'https://github.com/{repository}/actions/runs/'
+                         + os.environ['GITHUB_RUN_ID'] if 'GITHUB_RUN_ID' in os.environ else None),
+        'root_wheel': wheel.name,
+        'root_wheel_sha256': hashlib.sha256(wheel.read_bytes()).hexdigest(),
+        'reporter_release': (ROOT / 'reporter-release.txt').read_text().strip(),
+        'architecture': arch,
+        'scenario_source_sha256': hashlib.sha256(
+            (ROOT / 'tests/features/installed.feature').read_bytes()).hexdigest(),
+        'result_scope': 'Five installed-user scenarios; not exhaustive feature coverage',
+    }
+    (guide / 'build.json').write_text(json.dumps(provenance, indent=2) + '\n')
+    (guide / 'feature-results.json').write_text(json.dumps(rows, indent=2) + '\n')
+    (guide / 'provenance.rst').write_text(
+        'Build and verification provenance\n=================================\n\n'
+        'This manual describes a verified candidate at the recorded source revision.\n'
+        'Package version 0.0.0 is the CI candidate version, not a published release.\n'
+        'Scenario results are a snapshot from that build, not a live service monitor.\n\n'
+        f"`Source revision <{provenance['source_url']}>`_\n\n"
+        + (f"`Verification run <{provenance['workflow_run']}>`_\n\n"
+           if provenance['workflow_run'] else 'Local build; no hosted verification run recorded.\n\n')
+        + '.. literalinclude:: build.json\n   :language: json\n\n'
+        + '`Build record <build.json>`_ | `Scenario outcomes <feature-results.json>`_\n')
     # Install only the packaged command and runtime dependencies into an isolated
     # import directory; Sphinx uses the locked development tools, never src/.
     packages = output / 'packages'
