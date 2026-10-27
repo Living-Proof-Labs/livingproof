@@ -54,6 +54,15 @@ jobs:
       - name: Build browsable command and scenario documentation
         if: ${{ !cancelled() && hashFiles('dist/image-*.tar') != '' }}
         run: task docs
+      - name: Set up documentation browser checks
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task docs:test:setup
+      - name: Install the pinned Playwright Chromium browser
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: uv run --locked --no-sync --group docs-test playwright install --with-deps chromium
+      - name: Exercise manual navigation, search, themes and command sections
+        if: ${{ !cancelled() && matrix.architecture == 'amd64' && hashFiles('artifacts/docs/html/build.json') != '' }}
+        run: task test:docs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         id: documentation
         if: ${{ !cancelled() }}
@@ -61,6 +70,9 @@ jobs:
           name: documentation-${{ inputs.version }}-${{ matrix.architecture }}
           path: |
             artifacts/docs/html/
+            artifacts/docs/screenshots/
+            artifacts/docs/source-manifest.json
+            artifacts/docs/installed-commands.json
             artifacts/features/
           if-no-files-found: error
           retention-days: 14
@@ -68,7 +80,7 @@ jobs:
         if: ${{ !cancelled() && steps.documentation.outputs.artifact-url != '' }}
         env:
           DOCS_URL: ${{ steps.documentation.outputs.artifact-url }}
-        run: echo "[Generated documentation and scenario evidence]($DOCS_URL) — download, extract and open docs/html/index.html (14-day retention)." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "[Generated documentation and scenario evidence]($DOCS_URL) — extract the whole tree and serve docs/html over loopback HTTP (14-day retention; see verification guide)." >> "$GITHUB_STEP_SUMMARY"
       - name: Generate actual compatibility evidence
         if: ${{ !cancelled() }}
         run: uv run --locked --no-sync python tools/compatibility_summary.py >> "$GITHUB_STEP_SUMMARY"

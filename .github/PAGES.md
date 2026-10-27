@@ -4,8 +4,7 @@
 The `documentation` job in `verify.yml` publishes only after the existing package
 verification (both native builds and installed consumers) and development checks
 succeed on a push to `main`. Pull requests build documentation for review but
-cannot deploy. No `pull_request_target`, privileged `workflow_run` handler, custom
-domain, or additional token is used. The deployment job has only `pages: write`
+cannot deploy. No `pull_request_target`, privileged `workflow_run` handler, domain change, or additional token is used. The deployment job has only `pages: write`
 and `id-token: write`; it does not check out or execute repository code.
 
 Inside its deployment concurrency lock, the job reads the public repository's
@@ -32,7 +31,8 @@ Pages publication was explicitly approved. With the authorized Rivet account:
 
 1. Open <https://github.com/Living-Proof-Labs/livingproof/settings/pages>.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-3. Keep the default GitHub Pages domain; do not configure a custom domain or DNS.
+3. Preserve the existing organization Pages domain setup; this renderer change
+   requires no repository domain or DNS changes.
 4. Inspect the `github-pages` environment and retain a deployment branch policy
    restricted to `main`; do not expand it to pull request branches.
 
@@ -48,16 +48,16 @@ Direct opening through Android `content://` providers may break sibling pages,
 styles or search even after full extraction; do not treat it as a missing build.
 
 After the independently reviewed change merges, use the deployment job's emitted
-`page_url` as the authoritative URL. The expected default project URL is
-`https://living-proof-labs.github.io/livingproof/`; it is not a verified live link
-until deployment succeeds. Then:
+`page_url` as the authoritative URL. The verified canonical project URL is
+`https://docs.livingprooflabs.com/livingproof/`. Verify the newly deployed revision
+there after each renderer change. Then:
 
 - Open the public URL in a browser, follow navigation to Command reference,
-  Executable user journeys, and Build and verification provenance, and return home.
+  Executable scenarios, and Build and verification provenance, and return home.
 - Inspect root/plugin commands and their nested terminal help; confirm styles and
   scripts load under the `/livingproof/` project path.
 - Use the site's search box for `plugins` and open a command-reference result.
-  Repeat with `manifest` and open a scenario result. Checking searchindex.js alone
+  Repeat with `manifest` and open a scenario result. Checking a generated search index alone
   does not demonstrate working interactive search.
 - Compare `build.json` and `feature-results.json` with the deployed run/commit.
 - Record the URL, run, commit, browser results and any failure in the PR. Add the
