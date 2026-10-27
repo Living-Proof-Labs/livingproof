@@ -353,3 +353,20 @@ def test_shared_navigation_identity_and_keyboard(browser, server, output, width)
     expect(page.locator('#docs')).to_be_visible()
     expect(article(page)).to_contain_text('uv run --locked --no-sync python tools/docs.py')
     context.close()
+
+
+@pytest.mark.parametrize('anchor', [
+    'from-a-claim-to-a-portable-report', 'what-exists-and-what-is-planned',
+    'candidate-evaluator-integrations',
+])
+def test_organization_narrative_bookmarks_forward(browser, server, anchor):
+    page = browser.new_page()
+    page.goto(f'{server}/index.html#{anchor}')
+    expect(page.locator(f'#{anchor}')).to_be_visible()
+    page.reload()
+    expect(page.locator(f'#{anchor}')).to_be_visible()
+    expect(article(page).get_by_role('link', name='published manual directory')).to_have_attribute(
+        'href', 'https://docs.livingprooflabs.com/#published-manuals')
+    expect(article(page).get_by_role('link', name='organization vision', exact=True)).to_have_attribute(
+        'href', 'https://docs.livingprooflabs.com/vision.html')
+    page.close()
