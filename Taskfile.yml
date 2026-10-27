@@ -78,6 +78,14 @@ tasks:
     cmds:
       - uv run --locked --no-sync python tools/feature_results.py
   docs:
-    desc: Build browsable Click and scenario docs from packaged images and current results
+    desc: Build the Markdown manual from packaged Click commands and current scenario results
     cmds:
       - uv run --locked --no-sync python tools/docs.py
+  docs:test:setup:
+    desc: Install the separately locked browser test tools
+    cmds:
+      - uv sync --locked --inexact --no-python-downloads --group docs-test
+  test:docs:
+    desc: Check manual links, command sections and real browser behavior
+    cmds:
+      - uv run --locked --no-sync --group docs-test pytest tests/docs --junitxml=artifacts/docs-tests.xml
