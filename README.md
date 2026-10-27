@@ -131,21 +131,22 @@ Task, runtime network dependency or automatic plugin installation:
 - `ghcr.io/living-proof-labs/livingproof:VERSION-reporting` contains root plus the
   pinned reporter v1.6.0. Its standalone command and library remain installed.
 
-Use an explicit released version, never a moving `latest` tag. Native amd64/arm64
-images are also attached as `image-ARCH.tar` and `reporting-image-ARCH.tar`; saved
-images remain usable if registry publication or access is unavailable. Check the
-release workflow's registry checks for actual anonymous availability. Loading a
-saved image uses its architecture-specific tag:
+Routine releases distribute native amd64/arm64 containers through the public
+registry after anonymous digest-pinned checks pass on both architectures. Release
+notes list the immutable registry manifest digests and tested platforms; these are
+not local Docker image IDs. Copy the reporting digest from those notes:
 
 ```sh
-VERSION=1.1.0  # replace with the selected release version
-ARCH=amd64    # use arm64 on ARM
-sha256sum --ignore-missing -c SHA256SUMS
-docker load -i "reporting-image-${ARCH}.tar"
+IMAGE=ghcr.io/living-proof-labs/livingproof@sha256:REPLACE_WITH_RELEASE_MANIFEST_DIGEST
+docker pull "$IMAGE"
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/bundle:/data:ro" \
-  "ghcr.io/living-proof-labs/livingproof:${VERSION}-reporting-${ARCH}" \
-  capability report validate manifest.json
+  "$IMAGE" capability report validate manifest.json
 ```
+
+For an explicit offline export, pull the selected digest on the target architecture
+and run `docker save -o livingproof-offline.tar "$IMAGE"`. Transfer that file and
+its checksum to the offline host and use `docker load`. Routine releases no longer
+attach image archives; existing release assets remain available unchanged.
 
 The normal entrypoint is `livingproof`. A job container can override it with
 `--entrypoint /bin/sh`; CI checks normal and shell/interpreter entrypoint use
