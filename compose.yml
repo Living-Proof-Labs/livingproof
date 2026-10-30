@@ -3,6 +3,8 @@ services:
     build:
       context: .
       target: development
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
     working_dir: /workspace/livingproof
     volumes:
       - .:/workspace/livingproof

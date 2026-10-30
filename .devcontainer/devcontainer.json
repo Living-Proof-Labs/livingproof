@@ -3,7 +3,10 @@
   "build": {
     "dockerfile": "../Dockerfile",
     "context": "..",
-    "target": "development"
+    "target": "development",
+    "args": {
+      "APT_MIRROR": "${localEnv:APT_MIRROR}"
+    }
   },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
