@@ -4,7 +4,7 @@ services:
       context: .
       target: development
       args:
-        APT_MIRROR: ${APT_MIRROR:-https://deb.debian.org}
+        APT_MIRROR: ${APT_MIRROR:-}
     working_dir: /workspace/livingproof
     volumes:
       - .:/workspace/livingproof

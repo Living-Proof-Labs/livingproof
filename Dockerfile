@@ -8,13 +8,15 @@ FROM ghcr.io/astral-sh/uv:0.12.23 AS uv-tools
 FROM python-base AS development
 COPY --from=uv-tools /uv /uvx /usr/local/bin/
 ARG TASK_VERSION=3.54.0
-# Debian sources use HTTPS by default; the python base image already ships
+# Debian sources use HTTPS by default (empty APT_MIRROR = https://deb.debian.org);
+# the python base image already ships
 # ca-certificates. APT_MIRROR replaces the deb.debian.org origin for both the
 # main and security suites (e.g. https://cloudfront.debian.net behind a proxy
 # that breaks deb.debian.org). Failed index downloads stop the build.
-ARG APT_MIRROR=https://deb.debian.org
+ARG APT_MIRROR=
 RUN set -eu; \
-    sed -i -E "s#^URIs: https?://deb\.debian\.org/#URIs: ${APT_MIRROR%/}/#" /etc/apt/sources.list.d/debian.sources; \
+    mirror="${APT_MIRROR:-https://deb.debian.org}"; \
+    sed -i -E "s#^URIs: https?://deb\.debian\.org/#URIs: ${mirror%/}/#" /etc/apt/sources.list.d/debian.sources; \
     grep '^URIs:' /etc/apt/sources.list.d/debian.sources; \
     apt-get -o APT::Update::Error-Mode=any update; \
     apt-get install -y --no-install-recommends bash ca-certificates curl git dpkg-dev; \

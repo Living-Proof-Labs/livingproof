@@ -5,7 +5,7 @@
     "context": "..",
     "target": "development",
     "args": {
-      "APT_MIRROR": "${localEnv:APT_MIRROR:https://deb.debian.org}"
+      "APT_MIRROR": "${localEnv:APT_MIRROR}"
     }
   },
   "remoteUser": "vscode",
