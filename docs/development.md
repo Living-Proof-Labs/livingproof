@@ -89,6 +89,8 @@ interactive commands, opts into the reporter, produces a report, restarts the
 container and checks commands/completion again. It removes its own test container.
 This verifies the actual configuration lifecycle, not a live browser editor session.
 Host proxy/CA overrides, if needed locally, stay outside the committed config.
+For a Debian mirror override, export `APT_MIRROR` (an origin such as
+`https://cloudfront.debian.net`) before `task dev:build` or `devcontainer up`.
 `DEVCONTAINER_CONFIG` selects such a local override; it must not change project
 commands or silently skip lifecycle hooks. No paid Codespaces are started by CI.
 

@@ -207,6 +207,12 @@ and [Click's completion protocol](https://click.palletsprojects.com/en/stable/sh
 
 ## Develop and contribute
 
+The `task dev:*` commands call `docker compose`, so the host needs the Docker
+Compose plugin (`docker compose version`) in addition to Docker. If the default
+HTTPS Debian source is unreachable, set `APT_MIRROR` (for example
+`APT_MIRROR=https://cloudfront.debian.net task dev:build`); the devcontainer
+reads the same variable from the host environment.
+
 Use [the contributor guide](docs/development.md) for Docker, devcontainer, Task,
 installed smoke tests and release handling. The pinned shared baseline is
 [collaboration-guidelines v6.0.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/v6.0.0).
