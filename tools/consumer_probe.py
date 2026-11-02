@@ -44,19 +44,21 @@ def combined():
     assert nested_version.split(", version ", 1)[1] == standalone_version.split(", version ", 1)[1]
     assert standalone_version.startswith("livingproof-capability-report, version ")
     from livingproof.cli import main
-    from livingproof_capability_report import grade
+    from livingproof_capability_report import render
     assert "/workspace" not in __import__("livingproof").__file__
-    assert main and grade
+    assert main and render
     with tempfile.TemporaryDirectory() as temporary:
         outputs = Path(temporary)
         for prefix, name in ((["livingproof", "capability", "report"], "nested"),
                              (["livingproof-capability-report"], "standalone")):
             run([*prefix, "validate", "/input/manifest.json"])
-            run([*prefix, "grade", "/input/manifest.json", "-o", str(outputs / f"{name}.json")])
+            run([*prefix, "render", "/input/manifest.json", "--format", "json",
+                 "-o", str(outputs / f"{name}.json")])
             for format in ("table", "json", "html", "csv"):
                 run([*prefix, "render", str(outputs / f"{name}.json"), "--format", format,
                      "-o", str(outputs / f"{name}.{format}.out")])
-            run([*prefix, "grade", "/input/manifest.json", "-o", str(outputs / f"{name}.json")], 1)
+            run([*prefix, "render", "/input/manifest.json", "--format", "json",
+                 "-o", str(outputs / f"{name}.json")], 1)
             run([*prefix, "validate", "/input/missing.json"], 2)
         assert (outputs / "nested.json").read_bytes() == (outputs / "standalone.json").read_bytes()
         for format in ("table", "json", "html", "csv"):
@@ -64,9 +66,9 @@ def combined():
                 outputs / f"standalone.{format}.out").read_bytes()
         report = json.loads((outputs / "nested.json").read_text())
         decisions = {d["result_id"]: d["status"] for d in report["decisions"]}
-        assert decisions["v1.1.1-slow"] == "PASS"
-        assert decisions["v1.2.0-slow"] == "FAIL"
-        assert decisions["v1.2.0-insufficient"] == "INSUFFICIENT_EVIDENCE"
+        assert decisions["stock-seed-01"] == "PASS"
+        assert decisions["stock-seed-04"] == "FAIL"
+        assert sorted(decisions.values()).count("PASS") == 12 and len(decisions) == 20
         print((outputs / "nested.table.out").read_text())
     completion = subprocess.run(["livingproof"], env={**os.environ,
         "_LIVINGPROOF_COMPLETE": "bash_complete",

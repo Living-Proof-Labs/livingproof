@@ -52,7 +52,7 @@ def test_recorded_outcomes_and_provenance(output):
     assert hashlib.sha256(wheel.read_bytes()).hexdigest() == build['root_wheel_sha256']
     assert build['scenario_source_sha256'] == hashlib.sha256(
         (ROOT / 'tests/features/installed.feature').read_bytes()).hexdigest()
-    assert build['reporter_release'] == (ROOT / 'reporter-release.txt').read_text().strip()
+    assert build['reporter_release'] == (ROOT / 'reporter-release.txt').read_text().split()[0]
 
 
 def test_internal_pages_assets_and_fragments(output):

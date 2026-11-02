@@ -49,7 +49,7 @@ def docker():
     return args + ["-v", f"{ROOT}/tools/consumer_probe.py:/probe.py:ro",
                    "-v", f"{records}:/results", "-v", f"{ROOT}/dist:/packages:ro",
                    "-v", f"{ROOT}/artifacts/reporter/livingproof-capability-report_"
-                   f"{(ROOT / 'reporter-release.txt').read_text().strip()[1:]}_all.deb:/reporter.deb:ro",
+                   f"{(ROOT / 'reporter-release.txt').read_text().split()[0][1:]}_all.deb:/reporter.deb:ro",
                    "-v", f"{ROOT}/artifacts/reporter/source/examples/bundle:/input:ro",
                    "-e", f"COMPATIBILITY_HOST_MACHINE={platform.machine()}",
                    "-e", f"COMPATIBILITY_EVIDENCE={EVIDENCE}"]

@@ -47,3 +47,25 @@ def test_checksum_precedes_source_consumption(tmp_path, monkeypatch, tampered):
         assert (tmp_path / "artifacts/reporter" / filename).read_bytes() == data
         assert "v1.4.0" in cloned[0]
     assert all("/releases/download/v1.4.0/" in url for url in requested)
+
+
+def test_release_pins_tag_and_image_digests(tmp_path, monkeypatch):
+    monkeypatch.setattr(fetcher, "ROOT", tmp_path)
+    index, amd64 = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+    (tmp_path / "reporter-release.txt").write_text(f"v3.0.1\nindex {index}\namd64 {amd64}\n")
+    assert fetcher.release() == ("v3.0.1", {"index": index, "amd64": amd64})
+
+
+@pytest.mark.parametrize("line", ["index sha256:short", "riscv sha256:" + "a" * 64,
+                                  "index latest"])
+def test_release_rejects_malformed_digest_pins(tmp_path, monkeypatch, line):
+    monkeypatch.setattr(fetcher, "ROOT", tmp_path)
+    (tmp_path / "reporter-release.txt").write_text(f"v3.0.1\n{line}\n")
+    with pytest.raises(ValueError, match="digest lines"):
+        fetcher.release()
+
+
+def test_repository_pin_is_digest_pinned():
+    tag, digests = fetcher.release()
+    assert set(digests) == {"index", "amd64", "arm64"}
+    assert tag.startswith("v3.")

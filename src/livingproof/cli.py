@@ -12,7 +12,7 @@ from .plugin_management import plugins
 PLUGIN_GROUP = "livingproof.capability.commands"
 INSTALL_REPORT = (
     "Install explicitly with: livingproof plugins install livingproof-capability-report. "
-    "To pin a release, append --version 1.6.0. The installer targets the same Python environment or Debian package "
+    "To pin a release, append --version 3.0.1. The installer targets the same Python environment or Debian package "
     "context as livingproof and verifies the required common dependency. "
     "No packages are installed automatically."
 )

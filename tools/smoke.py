@@ -89,11 +89,13 @@ def smoke():
                                   ([standalone], "standalone")]:
                 run([*prefix, "--help"], work)
                 run([*prefix, "validate", "bundle/manifest.json"], work)
-                run([*prefix, "grade", "bundle/manifest.json", "-o", f"{label}.json"], work)
+                run([*prefix, "render", "bundle/manifest.json", "--format", "json",
+                     "-o", f"{label}.json"], work)
                 for format in ("table", "json", "html", "csv"):
                     run([*prefix, "render", f"{label}.json", "--format", format,
                          "-o", f"{label}.{format}.out"], work)
-                run([*prefix, "grade", "bundle/manifest.json", "-o", f"{label}.json"], work, 1)
+                run([*prefix, "render", "bundle/manifest.json", "--format", "json",
+                     "-o", f"{label}.json"], work, 1)
                 run([*prefix, "validate", "missing.json"], work, 2)
             assert json.loads((work / "nested.json").read_text()) == json.loads(
                 (work / "standalone.json").read_text())
@@ -104,7 +106,7 @@ def smoke():
                 "_LIVINGPROOF_COMPLETE": "bash_complete",
                 "COMP_WORDS": "livingproof capability report r", "COMP_CWORD": "3"})
             assert "plain,render" in completion
-            run([python, "-c", "from livingproof_capability_report import grade, render"], work)
+            run([python, "-c", "from livingproof_capability_report import render, validate_bundle"], work)
             run([python, "-m", "pip", "uninstall", "-y", "livingproof-capability-report"], work)
             completion_probe("absent", completion_setup)
             run([python, "-m", "pip", "install", Path(reporter).resolve()], work)
