@@ -29,7 +29,6 @@ Feature: Use the installed Living Proof Labs command home
     When I run "livingproof capability report --help"
     Then the exit status is 0
     And the output contains "validate"
-    And the output contains "grade"
     And the output contains "render"
 
   Scenario: Installed root validates a published example bundle

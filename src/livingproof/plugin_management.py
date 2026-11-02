@@ -77,7 +77,7 @@ def release(name, version):
     if version:
         version = version.removeprefix('v')
         if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[a-zA-Z0-9.+-]*)', version):
-            fail('Version must be a release version such as 1.6.0, not a URL or repository name.')
+            fail('Version must be a release version such as 3.0.1, not a URL or repository name.')
         result = api(name, '/tags/' + quote('v' + version, safe=''))
     else:
         result = api(name, '/latest')

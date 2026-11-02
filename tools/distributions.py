@@ -18,7 +18,7 @@ def build():
     subprocess.run(["python", "tools/fetch_reporter.py", "--distributions"], cwd=ROOT, check=True)
     wheel, = (ROOT / "dist").glob("livingproof-*.whl")
     version = wheel.name.split("-")[1]
-    reporter_version = (ROOT / "reporter-release.txt").read_text().strip()[1:]
+    reporter_version = (ROOT / "reporter-release.txt").read_text().split()[0][1:]
     with tarfile.open(ROOT / f"artifacts/reporter/wheelhouse-{ARCH}.tar.gz") as archive:
         archive.extractall(ROOT / "dist", filter="data")
     shutil.copyfile(wheel, ROOT / "dist/wheels" / wheel.name)

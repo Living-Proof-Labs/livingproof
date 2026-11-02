@@ -38,13 +38,13 @@ the root command. Ordinary commands never download or install plugins automatica
 | --- | --- | --- |
 | Debian/Ubuntu | Root `all.deb`, installed with apt | Reporter `all.deb`, installed with apt; both use `/usr/bin/python3` |
 | Python virtual environment | Root wheel or source distribution | Reporter wheel installed into that same virtual environment |
-| Container | Versioned root image | Explicit `-reporting` image variant includes reporter v1.6.0 |
+| Container | Versioned root image | Explicit `-reporting` image variant includes reporter v3.0.1 |
 
 ### Debian and Ubuntu
 
 Download the root `.deb` and checksums into `root-release`. Download the reporter
 `.deb` and its checksums from
-[reporter v1.6.0](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v1.6.0)
+[reporter v3.0.1](https://github.com/Living-Proof-Labs/livingproof-capability-report/releases/tag/v3.0.1)
 into `reporter-release`. Then:
 
 ```sh
@@ -52,7 +52,7 @@ into `reporter-release`. Then:
 (cd reporter-release && sha256sum --ignore-missing -c SHA256SUMS)
 sudo apt install ./root-release/python3-livingproof-common_1.0.0_all.deb ./root-release/livingproof_*_all.deb
 livingproof --help
-livingproof capability report --help  # explains that the plugin is not installed yet
+livingproof capability report --help  # exits 1: explains that the plugin is not installed yet
 sudo apt install ./reporter-release/livingproof-capability-report_*_all.deb
 livingproof capability report --help
 livingproof-capability-report --help
@@ -91,7 +91,7 @@ Task, runtime network dependency or automatic plugin installation:
 
 - `ghcr.io/living-proof-labs/livingproof:VERSION` contains the root command only.
 - `ghcr.io/living-proof-labs/livingproof:VERSION-reporting` contains root plus the
-  pinned reporter v1.6.0. Its standalone command and library remain installed.
+  pinned reporter v3.0.1. Its standalone command and library remain installed.
 
 Routine releases distribute native amd64/arm64 containers through the public
 registry after anonymous digest-pinned checks pass on both architectures. Release
@@ -117,26 +117,22 @@ plugin lives in the same `/opt/livingproof` Python environment as the root.
 
 ### Produce a report
 
-Use an existing portable evidence bundle. For a fixture demonstration, download
-the reporter v1.6.0 source archive and verify its published checksum, then extract
-only its example data (no source checkout or source execution is required):
+Use an existing portable evidence bundle 1.1.0, as written with its stored decisions
+by capability-verifier v1.9.0 or later. For a fixture demonstration, use the reporter
+v3.0.1 source archive already checksum-verified in `reporter-release`, and extract
+only its example bundle (no source checkout or source execution is required):
 
 ```sh
-tar -xzf reporter-release/livingproof_capability_report-1.6.0.tar.gz \
-  --strip-components=2 livingproof_capability_report-1.6.0/examples/bundle
+tar -xzf reporter-release/livingproof_capability_report-3.0.1.tar.gz \
+  --strip-components=2 livingproof_capability_report-3.0.1/examples/bundle
 livingproof capability report validate bundle/manifest.json
+livingproof capability report render bundle/manifest.json --format json -o report.json
+livingproof capability report render report.json --format html -o report.html
 ```
 
-The reporter does not grade: from reporter 3.0.0 it has no `grade` command. To get
-a report, assess the evidence with capability-verifier v1.9.0 or later, which writes
-bundle 1.1.0 with its decisions, then render that bundle (reporter 2.0.0 or later):
-
-```sh
-livingproof capability report render bundle/manifest.json --format html -o report.html
-```
-
-Output files must be new. Reporting errors and exit codes are preserved. A stored
-FAIL is an evidence outcome, not a test-run failure.
+The reporter only renders stored decisions; reporter 3.0.0 removed its `grade`
+command. Output files must be new. Reporting errors and exit codes are preserved.
+A stored FAIL is an evidence outcome, not a test-run failure.
 
 ### Shell completion
 
@@ -243,7 +239,9 @@ livingproof-capability-report --version
 Root uses released [livingproof-common v1.0.0](https://github.com/Living-Proof-Labs/livingproof-common/releases/tag/v1.0.0)
 with its own package directory. Nested reporting retains the reporter's identity;
 common's library version is never substituted for either consumer. The reporter
-release pin remains explicit in `reporter-release.txt`.
+release pin remains explicit in `reporter-release.txt`: its first line is the
+release tag, followed by the reporter image's multi-arch index and per-architecture
+manifest digests (`python tools/fetch_reporter.py --images` checks them).
 
 A clean exact release tag displays X.Y.Z. Development output includes release
 base, commit distance/hash, bounded public branch label and clean/dirty state.
@@ -265,8 +263,8 @@ is assumed. Runtime commands never download or install dependencies.
 ```sh
 livingproof plugins versions livingproof-capability-report
 livingproof plugins versions livingproof-capability-report --limit 120
-livingproof plugins install livingproof-capability-report --version 1.6.0 --dry-run
-livingproof plugins install livingproof-capability-report --version 1.6.0
+livingproof plugins install livingproof-capability-report --version 3.0.1 --dry-run
+livingproof plugins install livingproof-capability-report --version 3.0.1
 livingproof plugins status livingproof-capability-report
 ```
 

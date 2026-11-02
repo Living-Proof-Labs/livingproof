@@ -71,7 +71,7 @@ task test:installed
 
 The installed suite exercises native distribution containers with only package
 assets, fixture data and a test harness mounted. Application checkouts are absent.
-It tests root-alone guidance, explicit reporter installation, policy grades,
+It tests root-alone guidance, explicit reporter installation, stored decision rendering,
 terminal/JSON/HTML/CSV parity, errors, completion, uninstall independence and
 package metadata. CI repeats consumption using the **same amd64-built all.deb**
 on both native CPU architectures, then repeats against public release downloads.

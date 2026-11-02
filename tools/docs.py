@@ -141,7 +141,6 @@ def installed_evidence(guide):
     for suffix, commands in [('', [[], ['capability'], ['plugins'], ['completion']]),
                              ('-reporting', [['capability', 'report'],
                                             ['capability', 'report', 'validate'],
-                                            ['capability', 'report', 'grade'],
                                             ['capability', 'report', 'render']])]:
         image = f'ghcr.io/living-proof-labs/livingproof:{version}{suffix}-{arch}'
         identity = run(['docker', 'image', 'inspect', '--format', '{{.Id}}', image]).strip()
@@ -164,7 +163,7 @@ def installed_evidence(guide):
                          + os.environ['GITHUB_RUN_ID'] if 'GITHUB_RUN_ID' in os.environ else None),
         'root_wheel': wheel.name,
         'root_wheel_sha256': hashlib.sha256(wheel.read_bytes()).hexdigest(),
-        'reporter_release': (ROOT / 'reporter-release.txt').read_text().strip(),
+        'reporter_release': (ROOT / 'reporter-release.txt').read_text().split()[0],
         'architecture': arch,
         'scenario_source_sha256': hashlib.sha256(
             (ROOT / 'tests/features/installed.feature').read_bytes()).hexdigest(),
@@ -178,7 +177,7 @@ def build():
     stage()
     packages = OUTPUT / 'packages'
     wheel, = (ROOT / 'dist').glob('livingproof-*.whl')
-    reporter = (ROOT / 'reporter-release.txt').read_text().strip()[1:]
+    reporter = (ROOT / 'reporter-release.txt').read_text().split()[0][1:]
     subprocess.run(['uv', 'pip', 'install', '--no-index', '--target', str(packages),
                     '--find-links', str(ROOT / 'dist/wheels'), str(wheel),
                     f'livingproof-capability-report=={reporter}'], check=True)
