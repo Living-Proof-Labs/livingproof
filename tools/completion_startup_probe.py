@@ -19,9 +19,8 @@ def nested(shell):
     for line, expected in (
         ("livingproof cap", "livingproof capability "),
         ("livingproof capability rep", "livingproof capability report "),
-        ("livingproof capability report gr", "livingproof capability report grade "),
         ("livingproof capability report re", "livingproof capability report render "),
-        ("livingproof capability report grade --out", "livingproof capability report grade --output "),
+        ("livingproof capability report render --out", "livingproof capability report render --output "),
         ("livingproof capability report render --format ht", "livingproof capability report render --format html "),
         ("livingproof capability report validate mani", "livingproof capability report validate manifest\\ sample.json "),
     ):

@@ -52,14 +52,13 @@ def probe(state, setup="source /usr/share/bash-completion/bash_completion"):
                  ("livingproof capability rep", "livingproof capability report ")]
         if state == "installed":
             cases += [
-                ("livingproof capability report gr", "livingproof capability report grade "),
                 ("livingproof capability report re", "livingproof capability report render "),
                 ("livingproof capability report va", "livingproof capability report validate "),
-                ("livingproof capability report grade --out", "livingproof capability report grade --output "),
+                ("livingproof capability report render --out", "livingproof capability report render --output "),
                 ("livingproof capability report render --for", "livingproof capability report render --format "),
                 ("livingproof capability report render --format ht", "livingproof capability report render --format html "),
                 ("livingproof capability report validate mani", "livingproof capability report validate manifest\\ sample.json "),
-                ("livingproof capability report grade -o mani", "livingproof capability report grade -o manifest\\ sample.json "),
+                ("livingproof capability report render -o mani", "livingproof capability report render -o manifest\\ sample.json "),
             ]
         else:
             cases += [("livingproof capability report re", "livingproof capability report re")]

@@ -125,12 +125,18 @@ only its example data (no source checkout or source execution is required):
 tar -xzf reporter-release/livingproof_capability_report-1.6.0.tar.gz \
   --strip-components=2 livingproof_capability_report-1.6.0/examples/bundle
 livingproof capability report validate bundle/manifest.json
-livingproof capability report grade bundle/manifest.json -o report.json
-livingproof capability report render report.json --format html -o report.html
 ```
 
-Output files must be new. Reporting errors and exit codes are preserved. Fixture
-FAIL/INSUFFICIENT_EVIDENCE grades are expected evidence outcomes, not test-run failures.
+The reporter does not grade: from reporter 3.0.0 it has no `grade` command. To get
+a report, assess the evidence with capability-verifier v1.9.0 or later, which writes
+bundle 1.1.0 with its decisions, then render that bundle (reporter 2.0.0 or later):
+
+```sh
+livingproof capability report render bundle/manifest.json --format html -o report.html
+```
+
+Output files must be new. Reporting errors and exit codes are preserved. A stored
+FAIL is an evidence outcome, not a test-run failure.
 
 ### Shell completion
 

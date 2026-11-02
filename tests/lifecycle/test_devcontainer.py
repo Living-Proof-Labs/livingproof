@@ -32,9 +32,7 @@ def test_devcontainer_lifecycle():
         run([executable, "exec", *options, "bash", "-lc",
              "task plugin:install && task setup && "
              "livingproof capability report validate artifacts/reporter/source/examples/bundle/manifest.json && "
-             "livingproof capability report grade artifacts/reporter/source/examples/bundle/manifest.json "
-             "-o /tmp/devcontainer-report.json && "
-             "livingproof capability report render /tmp/devcontainer-report.json"])
+             "livingproof capability report render --help"])
         run(["docker", "restart", container])
         run([executable, "exec", *options, "bash", "-lc",
              "livingproof capability report --help && "
