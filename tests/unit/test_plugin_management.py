@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 import hashlib
+import importlib.util
+from io import BytesIO
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 
@@ -28,22 +31,113 @@ def test_absent_status_offline(monkeypatch):
     assert 'not installed' in result.output
 
 
-def test_pagination_and_default_limit(monkeypatch):
-    pages = []
-    def api(name, suffix):
-        pages.append(suffix)
-        page = int(suffix.split('page=')[-1])
-        return [{'tag_name': f'v{page}.{i}.0', 'name': f'Title {page}/{i}'} for i in range(100)]
-    monkeypatch.setattr(pm, 'api', api)
+def published_releases(count):
+    """Newest first. The release at index 20 is absent from the default window."""
+    return [{'tag_name': f'v{count - index}.0.0', 'name': f'Release {count - index}'}
+            for index in range(count)]
+
+
+def listing_text(records):
+    return ''.join(f"{record['tag_name']}\t{record['name']}\n" for record in records)
+
+
+def page_body(records, url):
+    page = int(url.rsplit('page=', 1)[-1])
+    start = (page - 1) * 100
+    return BytesIO(json.dumps(records[start:start + 100]).encode())
+
+
+@pytest.fixture
+def release_listing(monkeypatch):
+    """Feed versions with more than 20 releases, or an absent, empty, or error page."""
+    state = {'urls': []}
+
+    def urlopen(request, timeout):
+        state['urls'].append(request.full_url)
+        return state['handler'](request)
+
+    monkeypatch.setattr(pm, 'urlopen', urlopen)
+
+    def configure(handler):
+        state['handler'] = handler
+        state['urls'] = []
+        return state
+
+    return configure
+
+
+def test_recent_listing_keeps_only_the_newest_window(release_listing):
+    records = published_releases(130)
+    state = release_listing(lambda request: page_body(records, request.full_url))
     runner = CliRunner()
     result = runner.invoke(main, ['plugins', 'versions', pm.REPORTER])
     assert result.exit_code == 0
-    assert len(result.output.splitlines()) == 20
-    assert 'Title 1/0' in result.output
-    pages.clear()
-    result = runner.invoke(main, ['plugins', 'versions', pm.REPORTER, '--limit', '121'])
-    assert len(result.output.splitlines()) == 121
-    assert pages == ['?per_page=100&page=1', '?per_page=100&page=2']
+    lines = result.output.splitlines()
+    assert lines == [f'v{number}.0.0\tRelease {number}' for number in range(130, 110, -1)]
+    assert 'v110.0.0' not in result.output
+    assert [url.rsplit('page=', 1)[-1] for url in state['urls']] == ['1']
+    state['urls'].clear()
+    wider = runner.invoke(main, ['plugins', 'versions', pm.REPORTER, '--limit', '121'])
+    assert wider.exit_code == 0
+    wider_lines = wider.output.splitlines()
+    assert len(wider_lines) == 121
+    assert wider_lines[:20] == lines
+    assert wider_lines[20] == 'v110.0.0\tRelease 110'
+    assert [url.rsplit('page=', 1)[-1] for url in state['urls']] == ['1', '2']
+
+
+def test_absent_release_listing(release_listing):
+    def handler(request):
+        raise HTTPError(request.full_url, 404, 'absent', {}, None)
+    release_listing(handler)
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 1
+    assert 'not found' in result.output
+
+
+def test_empty_release_listing(release_listing):
+    release_listing(lambda request: BytesIO(b'[]'))
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 0
+    assert result.output == ''
+
+
+@pytest.mark.parametrize('payload,text', [
+    (b'not-json', 'invalid release metadata'),
+    (b'{"message": "bad"}', 'invalid release-list metadata'),
+])
+def test_error_release_listing(release_listing, payload, text):
+    release_listing(lambda request: BytesIO(payload))
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 1
+    assert text in result.output
+
+
+def test_release_listing_request_error(release_listing):
+    def handler(request):
+        raise HTTPError(request.full_url, 500, 'down', {}, None)
+    release_listing(handler)
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 1
+    assert 'HTTP 500' in result.output
+
+
+def load_probe():
+    path = Path(__file__).resolve().parents[2] / 'tools/plugin_management_probe.py'
+    spec = importlib.util.spec_from_file_location('plugin_management_probe', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_probe_listing_does_not_require_an_aged_out_release():
+    probe = load_probe()
+    records = published_releases(25)
+    probe.assert_recent_listing(listing_text(records[:20]), listing_text(records))
+    short = published_releases(5)
+    probe.assert_recent_listing(listing_text(short), listing_text(short))
+    with pytest.raises(AssertionError):
+        probe.assert_recent_listing(listing_text(records), listing_text(records))
 
 
 def test_unknown_name_rejected_before_network(monkeypatch):
