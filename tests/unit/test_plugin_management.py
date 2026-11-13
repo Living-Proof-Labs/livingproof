@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 from types import SimpleNamespace
+import socket
 from urllib.error import HTTPError, URLError
 
 from click.testing import CliRunner
@@ -218,6 +219,7 @@ def test_connection_reset_is_retried(monkeypatch, error):
     (HTTPError('https://api.github.com', 429, 'limited', {}, None), 'rate limit'),
     (HTTPError('https://api.github.com', 500, 'down', {}, None), 'HTTP 500'),
     (URLError('offline'), 'offline'),
+    (URLError(socket.gaierror(socket.EAI_NONAME, 'Name or service not known')), 'offline'),
 ])
 def test_non_transient_release_errors_fail_immediately(monkeypatch, error, text):
     def respond(attempt, request):
@@ -227,6 +229,34 @@ def test_non_transient_release_errors_fail_immediately(monkeypatch, error, text)
         pm.request('https://api.github.com')
     assert len(calls) == 1
     assert sleeps == []
+
+
+@pytest.mark.parametrize('error', [
+    TimeoutError('timed out'),
+    URLError(TimeoutError('timed out')),
+    URLError(socket.timeout('timed out')),
+], ids=['timeout', 'wrapped timeout', 'wrapped socket.timeout'])
+def test_timeout_is_retried(monkeypatch, error):
+    def respond(attempt, request):
+        if attempt == 1:
+            raise error
+        return BytesIO(b'ok')
+    calls, sleeps = release_transport(monkeypatch, respond)
+    assert pm.request('https://api.github.com/repos/example/releases/tags/v1.6.0') == b'ok'
+    assert len(calls) == 2
+    assert sleeps == [pm.RELEASE_RETRY_BASE_SECONDS]
+
+
+def test_fourth_attempt_can_succeed(monkeypatch):
+    def respond(attempt, request):
+        if attempt < pm.RELEASE_ATTEMPTS:
+            raise HTTPError(request.full_url, 502, 'bad gateway', {}, None)
+        return BytesIO(b'ok')
+    calls, sleeps = release_transport(monkeypatch, respond)
+    assert pm.request('https://api.github.com/repos/example/releases/tags/v1.6.0') == b'ok'
+    assert len(calls) == pm.RELEASE_ATTEMPTS
+    assert sleeps == [pm.RELEASE_RETRY_BASE_SECONDS, pm.RELEASE_RETRY_MAX_DELAY_SECONDS,
+                      pm.RELEASE_RETRY_MAX_DELAY_SECONDS]
 
 
 def test_release_backoff_stays_under_the_cap(monkeypatch):
