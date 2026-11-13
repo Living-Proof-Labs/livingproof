@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 name: Publish individual test results
-description: Ingest JUnit cases into Checks and summaries, retaining failures and raw reports.
+description: >
+  Publish JUnit cases in the job summary and one completed check run.
+  A check API failure is a warning. Failed, missing, or unreadable reports still fail the job.
 inputs:
   name:
     required: true
@@ -11,8 +13,12 @@ inputs:
 runs:
   using: composite
   steps:
+    # Summary mode writes the case list and does not create a check run.
+    # continue-on-error keeps a reporter failure off the job result; the next step is the gate.
     - name: Individual cases in run summary
+      id: summary
       if: ${{ !cancelled() }}
+      continue-on-error: true
       uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a
       with:
         name: ${{ inputs.name }}
@@ -22,18 +28,18 @@ runs:
         collapsed: never
         fail-on-error: 'true'
         fail-on-empty: 'true'
-    - name: Individual check and failure annotations
+    - name: JUnit gate and completed check run
       id: checks
-      if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a
-      with:
-        name: ${{ inputs.name }}
-        path: ${{ inputs.path }}
-        reporter: python-xunit
-        use-actions-summary: 'false'
-        collapsed: never
-        fail-on-error: 'true'
-        fail-on-empty: 'true'
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        REPORT_NAME: ${{ inputs.name }}
+        REPORT_PATH: ${{ inputs.path }}
+        PUBLISH_CHECK: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      run: python tools/test_results.py --name "$REPORT_NAME" --path "$REPORT_PATH" --publish-check "$PUBLISH_CHECK"
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       id: raw
       if: ${{ !cancelled() }}

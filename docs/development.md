@@ -97,11 +97,13 @@ commands or silently skip lifecycle hooks. No paid Codespaces are started by CI.
 ## Visible CI results and release evidence
 
 `pytest` emits individual JUnit cases for unit, installed-package, devcontainer
-and registry suites. The pinned report publisher parses them into GitHub Checks
-with expanded cases/failure annotations and into the run summary. Summaries link
-to check views and raw reports, retained for 14 days. Report publication/upload
-is attempted after failure; failing tests retain their nonzero exit status and
-block release. Missing/malformed reports and publisher failures are errors.
+and registry suites. The job summary lists the cases. The reporting check run is
+created already completed, so a failed follow-up update cannot leave it in
+progress. Summaries link to check views and raw reports, retained for 14 days.
+Report publication and upload are attempted after failure; failing tests retain
+their nonzero exit status and block release. A missing or unreadable report fails
+the job. A failure to create or update the reporting check run is a warning and
+does not by itself fail the job.
 Forks retain summaries/artifacts; a read-only fork token cannot publish Checks.
 
 A deliberate test-only failure is used during adoption to verify that a failed
