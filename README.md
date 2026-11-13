@@ -306,8 +306,11 @@ fetch anything. `status` reads local metadata and checks that the discovered plu
 loads; it reports the actual package version, not a release lookup.
 
 Exit codes are 0 for success, 1 for absent/broken plugins or operational failures,
-and 2 for invalid arguments. Network failures, rate limits, unavailable assets and
-checksum failures abort before installation. Temporary downloads are removed.
+and 2 for invalid arguments. Release requests retry HTTP 502, 503 and 504 and
+transient connection failures with bounded backoff, then stop with the same error.
+Other statuses, including an unknown version or an access restriction, fail
+immediately. Network failures, rate limits, unavailable assets and checksum
+failures abort before installation. Temporary downloads are removed.
 Package-manager failures can leave partial dependency changes: inspect `plugins
 status`, fix the reported package-manager problem, and explicitly retry. Remove a
 Debian reporter with `apt-get remove livingproof-capability-report`, or a virtual

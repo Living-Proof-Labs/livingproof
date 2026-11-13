@@ -13,6 +13,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
@@ -28,6 +29,13 @@ REPORTER = 'livingproof-capability-report'
 COMMON = 'livingproof-common'
 REGISTRY = {REPORTER: ('Living-Proof-Labs/livingproof-capability-report', REPORTER),
             COMMON: ('Living-Proof-Labs/livingproof-common', 'python3-livingproof-common')}
+# Gateway responses and dropped connections only. Four attempts; delays double
+# from the base, each delay is capped, and the waits stay under the total cap.
+TRANSIENT_STATUS = frozenset({502, 503, 504})
+RELEASE_ATTEMPTS = 4
+RELEASE_RETRY_BASE_SECONDS = 0.5
+RELEASE_RETRY_MAX_DELAY_SECONDS = 1.0
+RELEASE_RETRY_TOTAL_CAP_SECONDS = 3.0
 
 
 def fail(message):
@@ -37,6 +45,36 @@ def fail(message):
 class NoAuthenticatedRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         fail('Authenticated release API request redirected unexpectedly; no credentials forwarded.')
+
+
+def pause(seconds):
+    time.sleep(seconds)
+
+
+def transient_release_failure(exc):
+    """HTTP 502/503/504, connection resets, and those failures wrapped by URLError."""
+    if isinstance(exc, HTTPError):
+        return exc.code in TRANSIENT_STATUS
+    reason = exc.reason if isinstance(exc, URLError) else exc
+    return isinstance(reason, (ConnectionError, TimeoutError))
+
+
+def retry_delay(index, elapsed):
+    proposed = min(RELEASE_RETRY_BASE_SECONDS * (2 ** index), RELEASE_RETRY_MAX_DELAY_SECONDS)
+    remaining = RELEASE_RETRY_TOTAL_CAP_SECONDS - elapsed
+    if proposed < remaining:
+        return proposed
+    return max(0.0, remaining)
+
+
+def report_release_failure(exc):
+    if isinstance(exc, HTTPError):
+        if exc.code in (403, 429):
+            fail('GitHub API rate limit or access restriction. Retry later; no installation performed.')
+        if exc.code == 404:
+            fail('Release or asset not found. Use livingproof plugins versions ' + REPORTER + '.')
+        fail(f'Release request failed (HTTP {exc.code}). Retry when the service is available.')
+    fail(f'Cannot download release data (offline, timeout or network failure): {exc}. Retry online.')
 
 
 def request(url):
@@ -49,21 +87,20 @@ def request(url):
     if token and (parsed.scheme, parsed.netloc) == ('https', 'api.github.com'):
         headers['Authorization'] = 'Bearer ' + token
         open_request = build_opener(NoAuthenticatedRedirect()).open
-    try:
-        with open_request(Request(url, headers=headers),
-                     timeout=30) as response:
-            data = response.read(128 * 1024 * 1024 + 1)
-            if len(data) > 128 * 1024 * 1024:
-                fail('Release response exceeds the 128 MiB safety limit.')
-            return data
-    except HTTPError as exc:
-        if exc.code in (403, 429):
-            fail('GitHub API rate limit or access restriction. Retry later; no installation performed.')
-        if exc.code == 404:
-            fail('Release or asset not found. Use livingproof plugins versions ' + REPORTER + '.')
-        fail(f'Release request failed (HTTP {exc.code}). Retry when the service is available.')
-    except (URLError, TimeoutError, OSError) as exc:
-        fail(f'Cannot download release data (offline, timeout or network failure): {exc}. Retry online.')
+    elapsed = 0.0
+    for attempt in range(RELEASE_ATTEMPTS):
+        try:
+            with open_request(Request(url, headers=headers), timeout=30) as response:
+                data = response.read(128 * 1024 * 1024 + 1)
+                if len(data) > 128 * 1024 * 1024:
+                    fail('Release response exceeds the 128 MiB safety limit.')
+                return data
+        except (HTTPError, URLError, TimeoutError, OSError) as exc:
+            if attempt + 1 == RELEASE_ATTEMPTS or not transient_release_failure(exc):
+                report_release_failure(exc)
+            delay = retry_delay(attempt, elapsed)
+            pause(delay)
+            elapsed += delay
 
 
 def api(name, suffix):
@@ -309,7 +346,9 @@ def install_command(name, version, dry_run):
     """Install verified official release artifacts and their exact common dependency.
 
     Debian-owned root uses apt; virtual-environment root uses that Python's pip.
-    Requires network access. An explicit version may upgrade or downgrade a plugin.
+    Requires network access. HTTP 502, 503 and 504 and connection resets are
+    retried with bounded backoff; other request errors fail immediately.
+    An explicit version may upgrade or downgrade a plugin.
     Repeating an installed version lets the package manager reconcile dependencies.
     No automatic sudo, passwords, system pip override, or interactive prompt.
     """
