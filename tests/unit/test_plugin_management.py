@@ -159,6 +159,91 @@ def test_network_errors(monkeypatch, error, text):
         pm.request('https://api.github.com')
 
 
+def release_transport(monkeypatch, respond):
+    """Script the release opener. respond(attempt, request) returns a body or raises."""
+    calls = []
+    sleeps = []
+
+    def urlopen(request, timeout):
+        calls.append(request.full_url)
+        return respond(len(calls), request)
+
+    monkeypatch.setattr(pm, 'urlopen', urlopen)
+    monkeypatch.setattr(pm, 'pause', sleeps.append)
+    return calls, sleeps
+
+
+@pytest.mark.parametrize('status', [502, 503, 504])
+def test_transient_status_then_success(monkeypatch, status):
+    def respond(attempt, request):
+        if attempt == 1:
+            raise HTTPError(request.full_url, status, 'unavailable', {}, None)
+        return BytesIO(b'ok')
+    calls, sleeps = release_transport(monkeypatch, respond)
+    assert pm.request('https://api.github.com/repos/example/releases/tags/v1.6.0') == b'ok'
+    assert len(calls) == 2
+    assert sleeps == [pm.RELEASE_RETRY_BASE_SECONDS]
+
+
+def test_repeated_502_fails_after_every_attempt(monkeypatch):
+    def respond(attempt, request):
+        raise HTTPError(request.full_url, 502, 'bad gateway', {}, None)
+    calls, sleeps = release_transport(monkeypatch, respond)
+    result = CliRunner().invoke(main, ['plugins', 'versions', pm.REPORTER])
+    assert result.exit_code == 1
+    assert result.output == (
+        'Error: Release request failed (HTTP 502). Retry when the service is available.\n')
+    assert len(calls) == pm.RELEASE_ATTEMPTS
+    assert len(sleeps) == pm.RELEASE_ATTEMPTS - 1
+
+
+@pytest.mark.parametrize('error', [
+    ConnectionResetError('Connection reset by peer'),
+    URLError(ConnectionResetError('Connection reset by peer')),
+], ids=['reset', 'wrapped reset'])
+def test_connection_reset_is_retried(monkeypatch, error):
+    def respond(attempt, request):
+        if attempt == 1:
+            raise error
+        return BytesIO(b'ok')
+    calls, sleeps = release_transport(monkeypatch, respond)
+    assert pm.request('https://api.github.com/repos/example/releases/tags/v1.6.0') == b'ok'
+    assert len(calls) == 2
+    assert sleeps == [pm.RELEASE_RETRY_BASE_SECONDS]
+
+
+@pytest.mark.parametrize('error,text', [
+    (HTTPError('https://api.github.com', 404, 'absent', {}, None), 'not found'),
+    (HTTPError('https://api.github.com', 403, 'denied', {}, None), 'rate limit'),
+    (HTTPError('https://api.github.com', 429, 'limited', {}, None), 'rate limit'),
+    (HTTPError('https://api.github.com', 500, 'down', {}, None), 'HTTP 500'),
+    (URLError('offline'), 'offline'),
+])
+def test_non_transient_release_errors_fail_immediately(monkeypatch, error, text):
+    def respond(attempt, request):
+        raise error
+    calls, sleeps = release_transport(monkeypatch, respond)
+    with pytest.raises(Exception, match=text):
+        pm.request('https://api.github.com')
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_release_backoff_stays_under_the_cap(monkeypatch):
+    def respond(attempt, request):
+        raise HTTPError(request.full_url, 502, 'bad gateway', {}, None)
+    calls, sleeps = release_transport(monkeypatch, respond)
+    with pytest.raises(Exception, match='HTTP 502'):
+        pm.request('https://api.github.com/repos/example/releases/tags/v1.6.0')
+    assert len(calls) == pm.RELEASE_ATTEMPTS
+    uncapped = sum(pm.RELEASE_RETRY_BASE_SECONDS * (2 ** index) for index in range(len(sleeps)))
+    assert uncapped > pm.RELEASE_RETRY_TOTAL_CAP_SECONDS
+    assert sleeps == [pm.RELEASE_RETRY_BASE_SECONDS, pm.RELEASE_RETRY_MAX_DELAY_SECONDS,
+                      pm.RELEASE_RETRY_MAX_DELAY_SECONDS]
+    assert all(delay <= pm.RELEASE_RETRY_MAX_DELAY_SECONDS for delay in sleeps)
+    assert sum(sleeps) < pm.RELEASE_RETRY_TOTAL_CAP_SECONDS
+
+
 @pytest.mark.parametrize('checksum', ['0' * 64, None])
 def test_checksum_failure_no_file(tmp_path, monkeypatch, checksum):
     asset = {'name': 'test.whl', 'browser_download_url':
