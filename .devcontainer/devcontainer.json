@@ -10,7 +10,18 @@
   },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
-  "postCreateCommand": "task setup && livingproof --help",
+  "containerEnv": {
+    "HTTP_PROXY": "${localEnv:HTTP_PROXY}",
+    "HTTPS_PROXY": "${localEnv:HTTPS_PROXY}",
+    "NO_PROXY": "${localEnv:NO_PROXY}",
+    "http_proxy": "${localEnv:http_proxy}",
+    "https_proxy": "${localEnv:https_proxy}",
+    "no_proxy": "${localEnv:no_proxy}"
+  },
+  "mounts": [
+    "source=${localEnv:DEV_CA_BUNDLE:/dev/null},target=/etc/ssl/certs/extra-ca.crt,type=bind,readonly"
+  ],
+  "postCreateCommand": ". /usr/local/bin/dev-ca-env.sh && task setup && livingproof --help",
   "customizations": {
     "vscode": {
       "extensions": [

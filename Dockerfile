@@ -21,6 +21,13 @@ RUN set -eu; \
     apt-get -o APT::Update::Error-Mode=any update; \
     apt-get install -y --no-install-recommends bash ca-certificates curl git dpkg-dev; \
     rm -rf /var/lib/apt/lists/*
+# Runtime certificate for uv and Python builds. Exported only when the mounted
+# PEM at /etc/ssl/certs/extra-ca.crt contains a certificate. This is separate
+# from the BuildKit secret `ca`, which applies only to the Task download below.
+COPY docker/dev-ca-env.sh docker/dev-entrypoint.sh /usr/local/bin/
+COPY docker/livingproof-ca.sh /etc/profile.d/livingproof-ca.sh
+RUN chmod 755 /usr/local/bin/dev-ca-env.sh /usr/local/bin/dev-entrypoint.sh \
+ && chmod 644 /etc/profile.d/livingproof-ca.sh
 RUN --mount=type=secret,id=ca,required=false set -eu; \
     if [ -f /run/secrets/ca ]; then export CURL_CA_BUNDLE=/run/secrets/ca; fi; \
     arch="$(dpkg --print-architecture)"; \
@@ -36,6 +43,7 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/livingproof-dev/venv UV_CACHE_DIR=/tmp/livingpro
 ENV PATH="/opt/livingproof-dev/venv/bin:${PATH}"
 WORKDIR /workspace/livingproof
 USER vscode
+ENTRYPOINT ["/usr/local/bin/dev-entrypoint.sh"]
 CMD ["sleep", "infinity"]
 
 FROM python-base AS runtime

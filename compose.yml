@@ -6,6 +6,14 @@ services:
       args:
         APT_MIRROR: ${APT_MIRROR:-}
     working_dir: /workspace/livingproof
+    environment:
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - NO_PROXY
+      - http_proxy
+      - https_proxy
+      - no_proxy
     volumes:
       - .:/workspace/livingproof
+      - "${DEV_CA_BUNDLE:-/dev/null}:/etc/ssl/certs/extra-ca.crt:ro"
     init: true
