@@ -14,6 +14,30 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCH = {"x86_64": "amd64", "aarch64": "arm64"}[platform.machine()]
 
 
+def registry_runtime_packages(lock):
+    """Lock packages whose wheels are copied into the offline image wheelhouse.
+
+    The reporter wheelhouse supplies every other runtime wheel. Packaging is the
+    root dependency that wheelhouse does not carry.
+    """
+    return [package for package in lock["package"] if package["name"] == "packaging"]
+
+
+def _fetch_wheel(url):
+    with urlopen(url, timeout=60) as response:
+        return response.read()
+
+
+def stage_locked_runtime_wheels(lock, wheels, fetch=_fetch_wheel):
+    """Write locked wheels selected by ``registry_runtime_packages``."""
+    for package in registry_runtime_packages(lock):
+        asset, = package["wheels"]
+        content = fetch(asset["url"])
+        if "sha256:" + hashlib.sha256(content).hexdigest() != asset["hash"]:
+            raise ValueError(f"Locked {package['name']} wheel checksum mismatch")
+        (Path(wheels) / asset["url"].rsplit("/", 1)[1]).write_bytes(content)
+
+
 def build():
     subprocess.run(["python", "tools/fetch_reporter.py", "--distributions"], cwd=ROOT, check=True)
     wheel, = (ROOT / "dist").glob("livingproof-*.whl")
@@ -26,13 +50,7 @@ def build():
     shutil.copyfile(common, ROOT / "dist/wheels" / common.name)
     # Root runtime dependency, independent of the reporter's wheelhouse.
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
-    package, = [p for p in lock['package'] if p['name'] == 'packaging']
-    asset, = package['wheels']
-    with urlopen(asset['url'], timeout=60) as response:
-        content = response.read()
-    if 'sha256:' + hashlib.sha256(content).hexdigest() != asset['hash']:
-        raise ValueError('Locked packaging wheel checksum mismatch')
-    (ROOT / 'dist/wheels' / asset['url'].rsplit('/', 1)[1]).write_bytes(content)
+    stage_locked_runtime_wheels(lock, ROOT / "dist/wheels")
     extra = []
     if os.environ.get("PACKAGE_NETWORK"):
         extra += ["--network", os.environ["PACKAGE_NETWORK"]]
