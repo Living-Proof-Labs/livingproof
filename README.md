@@ -213,7 +213,13 @@ The `task dev:*` commands call `docker compose`, so the host needs the Docker
 Compose plugin (`docker compose version`) in addition to Docker. If the default
 HTTPS Debian source is unreachable, set `APT_MIRROR` (for example
 `APT_MIRROR=https://cloudfront.debian.net task dev:build`); the devcontainer
-reads the same variable from the host environment.
+reads the same variable from the host environment. `HTTP_PROXY`, `HTTPS_PROXY`
+and `NO_PROXY` (and the lowercase forms) are passed into the development
+container when they are set. For a TLS-intercepting proxy, point `DEV_CA_BUNDLE`
+at a PEM certificate file (`DEV_CA_BUNDLE=/path/to/proxy-ca.pem task dev:verify`).
+The container trusts that certificate for uv, git and Python builds only when
+the file contains one, and keeps the combined bundle in a private file. When a
+proxy is set, loopback addresses stay out of that proxy.
 
 Use [the contributor guide](docs/development.md) for Docker, devcontainer, Task,
 installed smoke tests and release handling. The pinned shared baseline is

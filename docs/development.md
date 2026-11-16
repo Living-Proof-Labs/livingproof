@@ -9,9 +9,10 @@ socket is needed to edit, test or run the CLI inside the development container.
 ## Start a development environment
 
 Open the repository in its devcontainer. The standard workspace mount is used,
-matching Codespaces' `/workspaces` layout. `postCreateCommand` runs `task setup`
-and `livingproof --help`. The development environment is on PATH, so the command
-works directly in an interactive terminal. It is separate from system Python.
+matching Codespaces' `/workspaces` layout. `postCreateCommand` loads the optional
+proxy certificate, then runs `task setup` and `livingproof --help`. The
+development environment is on PATH, so the command works directly in an
+interactive terminal. It is separate from system Python.
 
 ```sh
 livingproof --help
@@ -88,11 +89,25 @@ The test calls `devcontainer up`, runs the configured creation hook, executes
 interactive commands, opts into the reporter, produces a report, restarts the
 container and checks commands/completion again. It removes its own test container.
 This verifies the actual configuration lifecycle, not a live browser editor session.
-Host proxy/CA overrides, if needed locally, stay outside the committed config.
 For a Debian mirror override, export `APT_MIRROR` (an origin such as
 `https://cloudfront.debian.net`) before `task dev:build` or `devcontainer up`.
-`DEVCONTAINER_CONFIG` selects such a local override; it must not change project
-commands or silently skip lifecycle hooks. No paid Codespaces are started by CI.
+`task dev:*` and the devcontainer pass `HTTP_PROXY`, `HTTPS_PROXY`,
+`NO_PROXY` and their lowercase forms into the development container when the
+host has set them. To trust a TLS-intercepting proxy, set `DEV_CA_BUNDLE` to a
+PEM certificate file on the host before `task dev:verify` or `devcontainer up`.
+The file is mounted at `/run/livingproof/extra-ca.crt`, outside the system
+certificate directory. When that file contains a certificate, the container
+appends it to the system bundle, stores the result in a new private file, and
+exports `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `PIP_CERT`,
+`GIT_SSL_CAINFO`, `UV_NATIVE_TLS` and `UV_SYSTEM_CERTS` for uv, git and Python
+builds. When a proxy is set, `localhost`, `127.0.0.1` and `::1` are added to
+`NO_PROXY`. With `DEV_CA_BUNDLE` unset, the mount is `/dev/null` and those
+certificate variables stay unset.
+The image build's Task download still uses the optional BuildKit secret `ca`;
+`DEV_CA_BUNDLE` applies when the container runs.
+`DEVCONTAINER_CONFIG` selects a local devcontainer override; it must not change
+project commands or silently skip lifecycle hooks. No paid Codespaces are started
+by CI.
 
 ## Visible CI results and release evidence
 

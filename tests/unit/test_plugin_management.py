@@ -131,6 +131,19 @@ def load_probe():
     return module
 
 
+def test_offline_probe_clears_no_proxy():
+    probe = load_probe()
+    env = probe.offline_env({
+        'NO_PROXY': '*', 'no_proxy': 'github.com', 'PATH': '/usr/bin',
+        'https_proxy': 'http://proxy.example:8080',
+    })
+    assert 'NO_PROXY' not in env
+    assert 'no_proxy' not in env
+    assert env['https_proxy'] == 'http://127.0.0.1:1'
+    assert env['HTTPS_PROXY'] == 'http://127.0.0.1:1'
+    assert env['PATH'] == '/usr/bin'
+
+
 def test_probe_listing_does_not_require_an_aged_out_release():
     probe = load_probe()
     records = published_releases(25)
