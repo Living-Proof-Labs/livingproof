@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
@@ -189,6 +190,12 @@ def check_summary(report):
     return text
 
 
+# One short wait before the final conclusion-only update, so a check-run GitHub has not
+# finished yet gets one more chance. Bounded: the job waits at most this once.
+FINAL_ATTEMPT_DELAY_S = 5
+pause = time.sleep
+
+
 def publish_check(api, *, name, head_sha, conclusion, title, summary, completed_at):
     """Create one completed check run. Return (check or None, warnings)."""
     warnings = []
@@ -233,19 +240,36 @@ def publish_check(api, *, name, head_sha, conclusion, title, summary, completed_
         warnings.append(warning(
             f'Reporting check-run {check_id} was still in progress after the detailed update. '
             'Retrying with a conclusion only.'))
+    conclusion_only = {
+        'status': 'completed',
+        'conclusion': conclusion,
+        'completed_at': completed_at,
+    }
     try:
-        finished = api.update_check_run(check_id, {
-            'status': 'completed',
-            'conclusion': conclusion,
-            'completed_at': completed_at,
-        })
+        finished = api.update_check_run(check_id, conclusion_only)
     except CheckApiError as error:
         warnings.append(warning(
-            f'Could not finish reporting check-run {check_id} ({error}).'))
+            f'Could not finish reporting check-run {check_id} ({error}). '
+            f'Making one final attempt in {FINAL_ATTEMPT_DELAY_S} s.'))
+        finished = None
+    if finished is not None and finished.get('status') == 'completed':
+        return finished, warnings
+    if finished is not None:
+        warnings.append(warning(
+            f'Reporting check-run {check_id} was still in progress after the conclusion '
+            f'update. Making one final attempt in {FINAL_ATTEMPT_DELAY_S} s.'))
+    pause(FINAL_ATTEMPT_DELAY_S)
+    try:
+        finished = api.update_check_run(check_id, conclusion_only)
+    except CheckApiError as error:
+        warnings.append(warning(
+            f'Could not finish reporting check-run {check_id} on the final attempt ({error}). '
+            'It may stay in progress; the job result still comes from the JUnit report.'))
         return None, warnings
     if finished.get('status') != 'completed':
         warnings.append(warning(
-            f'Reporting check-run {check_id} was not completed after the conclusion update.'))
+            f'Reporting check-run {check_id} was not completed after the final conclusion '
+            'update. It may stay in progress; the job result still comes from the JUnit report.'))
         return None, warnings
     return finished, warnings
 

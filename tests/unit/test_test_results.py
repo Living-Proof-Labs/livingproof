@@ -54,6 +54,8 @@ class FakeChecks:
         if status == 404:
             raise gate.CheckApiError(404, 'update')
         run = self.runs[-1]
+        if status == 'stale':
+            return dict(run)
         run['status'] = body.get('status', run['status'])
         if 'conclusion' in body:
             run['conclusion'] = body['conclusion']
@@ -70,6 +72,14 @@ def write_junit(path, cases):
             ET.SubElement(case, 'skipped', message=detail)
     path.parent.mkdir(parents=True, exist_ok=True)
     ET.ElementTree(suite).write(path, encoding='unicode')
+
+
+@pytest.fixture(autouse=True)
+def pauses(monkeypatch):
+    """Record the final-attempt delay instead of sleeping."""
+    seen = []
+    monkeypatch.setattr(gate, 'pause', seen.append, raising=False)
+    return seen
 
 
 def run_cli(tmp_path, monkeypatch, capsys, api, *, publish='true', pattern='artifacts/tests.xml'):
@@ -183,35 +193,75 @@ def test_create_502_warns_and_creates_no_check(tmp_path, monkeypatch, capsys):
     assert 'url_html=\n' in output
 
 
-def test_both_updates_404_warns_and_leaves_the_check_in_progress(tmp_path, monkeypatch, capsys):
+def test_both_updates_404_waits_once_and_a_final_update_finishes_the_check(
+        tmp_path, monkeypatch, capsys, pauses):
     write_junit(tmp_path / 'artifacts/tests.xml', [('test_ok', 'pass', '')])
-    api = FakeChecks(response_status='in_progress', update_statuses=[404, 404])
+    api = FakeChecks(response_status='in_progress', update_statuses=[404, 404, 200])
     code, printed, output, _summary = run_cli(tmp_path, monkeypatch, capsys, api)
     assert code == 0
     assert '::warning::' in printed
     assert '404' in printed
-    assert 'finish' in printed
     assert api.created_body['status'] == 'completed'
+    assert len(api.updates) == 3
     assert 'output' in api.updates[0]['body']
-    assert 'output' not in api.updates[1]['body']
+    assert api.updates[2]['body'] == api.updates[1]['body']
+    assert api.updates[2]['body'] == {
+        'status': 'completed', 'conclusion': 'success', 'completed_at': COMPLETED_AT}
+    assert pauses == [gate.FINAL_ATTEMPT_DELAY_S]
+    assert 0 < gate.FINAL_ATTEMPT_DELAY_S <= 10
+    assert api.runs[0]['status'] == 'completed'
+    assert api.runs[0]['conclusion'] == 'success'
+    assert f'url_html={HTML}' in output
+
+
+def test_a_conclusion_update_still_in_progress_gets_the_same_final_attempt(
+        tmp_path, monkeypatch, capsys, pauses):
+    write_junit(tmp_path / 'artifacts/tests.xml', [('test_ok', 'pass', '')])
+    api = FakeChecks(response_status='in_progress', update_statuses=[404, 'stale', 200])
+    code, printed, output, _summary = run_cli(tmp_path, monkeypatch, capsys, api)
+    assert code == 0
+    assert 'still in progress' in printed
+    assert len(api.updates) == 3
+    assert pauses == [gate.FINAL_ATTEMPT_DELAY_S]
+    assert api.runs[0]['status'] == 'completed'
+    assert f'url_html={HTML}' in output
+
+
+def test_three_failed_updates_stop_after_one_bounded_final_attempt(
+        tmp_path, monkeypatch, capsys, pauses):
+    write_junit(tmp_path / 'artifacts/tests.xml', [('test_ok', 'pass', '')])
+    api = FakeChecks(response_status='in_progress', update_statuses=[404, 404, 404])
+    code, printed, output, _summary = run_cli(tmp_path, monkeypatch, capsys, api)
+    assert code == 0
+    assert '::warning::' in printed
+    assert 'finish' in printed and 'final' in printed
+    assert len(api.updates) == 3
+    assert pauses == [gate.FINAL_ATTEMPT_DELAY_S]
     assert api.runs[0]['status'] == 'in_progress'
-    assert api.runs[0]['conclusion'] is None
     assert 'url_html=\n' in output
 
 
-def test_failed_junit_still_fails_when_both_updates_404(tmp_path, monkeypatch, capsys):
+def test_failed_junit_still_fails_when_every_update_404s(tmp_path, monkeypatch, capsys, pauses):
     write_junit(tmp_path / 'artifacts/tests.xml', [
         ('test_explicit_plugin_management', 'failure', 'AssertionError: assert 1 == 0'),
     ])
-    api = FakeChecks(response_status='in_progress', update_statuses=[404, 404])
+    api = FakeChecks(response_status='in_progress', update_statuses=[404, 404, 404])
     code, printed, output, _summary = run_cli(tmp_path, monkeypatch, capsys, api)
     assert code == 1
     assert 'failed=1' in output
     assert '::warning::' in printed
-    assert '404' in printed
     assert api.created_body['conclusion'] == 'failure'
+    assert len(api.updates) == 3
     assert api.runs[0]['status'] == 'in_progress'
-    assert api.runs[0]['conclusion'] is None
+
+
+def test_a_finished_update_never_waits(tmp_path, monkeypatch, capsys, pauses):
+    write_junit(tmp_path / 'artifacts/tests.xml', [('test_ok', 'pass', '')])
+    for statuses in ([200], [404, 200]):
+        api = FakeChecks(response_status='in_progress', update_statuses=statuses)
+        run_cli(tmp_path, monkeypatch, capsys, api)
+        assert len(api.updates) == len(statuses)
+    assert pauses == []
 
 
 def test_empty_report_fails_without_creating_a_check(tmp_path, monkeypatch, capsys):
