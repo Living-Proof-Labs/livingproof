@@ -15,12 +15,16 @@ ARCH = {"x86_64": "amd64", "aarch64": "arm64"}[platform.machine()]
 
 
 def registry_runtime_packages(lock):
-    """Lock packages whose wheels are copied into the offline image wheelhouse.
+    """Registry wheels for the root package's runtime dependencies.
 
-    The reporter wheelhouse supplies every other runtime wheel. Packaging is the
-    root dependency that wheelhouse does not carry.
+    The reporter wheelhouse is extracted first and can carry an older copy of
+    the same distribution. Staging replaces that copy with the locked wheel.
+    URL-sourced dependencies such as livingproof-common are fetched separately.
     """
-    return [package for package in lock["package"] if package["name"] == "packaging"]
+    root = next(package for package in lock["package"] if package["name"] == "livingproof")
+    names = {item["name"] for item in root["dependencies"]}
+    return [package for package in lock["package"]
+            if package["name"] in names and "registry" in package.get("source", {})]
 
 
 def _fetch_wheel(url):
@@ -28,14 +32,24 @@ def _fetch_wheel(url):
         return response.read()
 
 
+def _wheel_distribution(filename):
+    return filename.split("-", 1)[0]
+
+
 def stage_locked_runtime_wheels(lock, wheels, fetch=_fetch_wheel):
-    """Write locked wheels selected by ``registry_runtime_packages``."""
+    """Write locked runtime wheels, replacing any other version already present."""
+    wheels = Path(wheels)
     for package in registry_runtime_packages(lock):
         asset, = package["wheels"]
         content = fetch(asset["url"])
         if "sha256:" + hashlib.sha256(content).hexdigest() != asset["hash"]:
             raise ValueError(f"Locked {package['name']} wheel checksum mismatch")
-        (Path(wheels) / asset["url"].rsplit("/", 1)[1]).write_bytes(content)
+        filename = asset["url"].rsplit("/", 1)[1]
+        distribution = _wheel_distribution(filename)
+        for existing in list(wheels.glob("*.whl")):
+            if _wheel_distribution(existing.name) == distribution and existing.name != filename:
+                existing.unlink()
+        (wheels / filename).write_bytes(content)
 
 
 def build():
@@ -48,7 +62,8 @@ def build():
     shutil.copyfile(wheel, ROOT / "dist/wheels" / wheel.name)
     common = ROOT / "dist/livingproof_common-1.0.0-py3-none-any.whl"
     shutil.copyfile(common, ROOT / "dist/wheels" / common.name)
-    # Root runtime dependency, independent of the reporter's wheelhouse.
+    # Reporter wheelhouse copies of root runtime dependencies are replaced with
+    # the locked wheels. livingproof-common was copied above from its reviewed release.
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
     stage_locked_runtime_wheels(lock, ROOT / "dist/wheels")
     extra = []
