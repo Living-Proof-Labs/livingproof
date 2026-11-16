@@ -103,8 +103,9 @@ exports `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `PIP_CERT`,
 builds. When a proxy is set, `localhost`, `127.0.0.1` and `::1` are added to
 `NO_PROXY`. With `DEV_CA_BUNDLE` unset, the mount is `/dev/null` and those
 certificate variables stay unset.
-The image build's Task download still uses the optional BuildKit secret `ca`;
-`DEV_CA_BUNDLE` applies when the container runs.
+During the image build, apt and the Task download use the optional BuildKit secret `ca`
+(`docker build --secret id=ca,src=/path/to/proxy-ca.pem`): apt gets the system bundle
+plus that certificate for the build only. `DEV_CA_BUNDLE` applies when the container runs.
 `DEVCONTAINER_CONFIG` selects a local devcontainer override; it must not change
 project commands or silently skip lifecycle hooks. No paid Codespaces are started
 by CI.
