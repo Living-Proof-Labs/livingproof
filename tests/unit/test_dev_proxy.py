@@ -226,3 +226,55 @@ def test_bundle_is_private_and_does_not_follow_a_symlink(tmp_path):
     assert 'SYSTEM-CA-MARKER' in bundle.read_text()
     assert 'EXTRA-CA' in bundle.read_text()
     assert values['GIT_SSL_CAINFO'] == str(bundle)
+
+
+def _apt_step():
+    development = _stage('development')
+    start = development.index('RUN ', development.index('ARG APT_MIRROR='))
+    end = development.index('\n# ', start)
+    return development[start:end]
+
+
+def test_apt_trusts_the_optional_build_secret_ca():
+    """HTTPS apt behind a TLS-intercepting proxy uses the same optional secret as the Task download."""
+    step = _apt_step()
+    assert step.startswith('RUN --mount=type=secret,id=ca,required=false ')
+    assert '/etc/ssl/certs/ca-certificates.crt /run/secrets/ca' in step
+    assert 'Acquire::https::CAInfo=' in step
+    assert step.count('apt-get') == 2
+    for line in step.splitlines():
+        if 'apt-get ' in line:
+            assert '$apt_ca' in line, line
+    assert 'rm -f "$bundle"' in step
+
+
+def test_apt_step_without_the_secret_runs_the_plain_commands(tmp_path):
+    """With no secret mounted, apt gets no CAInfo override; with one, the bundle has both."""
+    step = _apt_step()
+    body = step.split(' set -eu; \\\n', 1)[1].replace(' \\\n', '\n')
+    ca_part = body[: body.index('mirror=')]
+    system = tmp_path / 'system.crt'
+    system.write_text('SYSTEM\n')
+    for secret, expect in ((None, ''), ('PROXY\n', 'SYSTEM\nPROXY\n')):
+        secret_path = tmp_path / 'secret'
+        if secret is None:
+            secret_path.unlink(missing_ok=True)
+        else:
+            secret_path.write_text(secret)
+        script = (
+            ca_part.replace('/etc/ssl/certs/ca-certificates.crt', str(system))
+            .replace('/run/secrets/ca', str(secret_path))
+            + '\nprintf "%s|" "$apt_ca"; [ -z "$bundle" ] || cat "$bundle"\n'
+        )
+        out = subprocess.run(['sh', '-c', 'set -eu\n' + script], capture_output=True, text=True, check=True).stdout
+        flag, _, contents = out.partition('|')
+        if secret is None:
+            assert flag == '' and contents == ''
+        else:
+            assert flag.startswith('-o Acquire::https::CAInfo=')
+            assert contents == expect
+
+
+def test_docs_name_the_build_secret_for_apt():
+    text = (ROOT / 'docs/development.md').read_text()
+    assert 'apt and the Task download use the optional BuildKit secret `ca`' in text
