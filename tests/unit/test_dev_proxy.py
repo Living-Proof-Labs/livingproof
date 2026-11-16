@@ -11,8 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 PROXY_VARS = ('HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy')
 CA_ENV = (
     'SSL_CERT_FILE', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE', 'PIP_CERT',
-    'UV_NATIVE_TLS', 'UV_SYSTEM_CERTS',
+    'GIT_SSL_CAINFO', 'UV_NATIVE_TLS', 'UV_SYSTEM_CERTS',
 )
+LOOPBACK = ('localhost', '127.0.0.1', '::1')
 PEM = '-----BEGIN CERTIFICATE-----\nEXTRA-CA\n-----END CERTIFICATE-----\n'
 
 
@@ -31,9 +32,10 @@ def test_compose_passes_proxy_vars_and_optional_ca():
     service = config['services']['development']
     assert service['build']['args']['APT_MIRROR'] == '${APT_MIRROR:-}'
     assert service['environment'] == list(PROXY_VARS)
-    assert '${DEV_CA_BUNDLE:-/dev/null}:/etc/ssl/certs/extra-ca.crt:ro' in text
+    assert '${DEV_CA_BUNDLE:-/dev/null}:/run/livingproof/extra-ca.crt:ro' in text
+    assert '/etc/ssl/certs' not in text
     volumes = service['volumes']
-    assert any('/etc/ssl/certs/extra-ca.crt' in str(item) for item in volumes)
+    assert any('/run/livingproof/extra-ca.crt' in str(item) for item in volumes)
 
 
 def test_devcontainer_passes_proxy_vars_and_optional_ca():
@@ -43,7 +45,7 @@ def test_devcontainer_passes_proxy_vars_and_optional_ca():
     for name in PROXY_VARS:
         assert environment[name] == '${localEnv:%s}' % name
     assert config['mounts'] == [
-        'source=${localEnv:DEV_CA_BUNDLE:/dev/null},target=/etc/ssl/certs/extra-ca.crt,'
+        'source=${localEnv:DEV_CA_BUNDLE:/dev/null},target=/run/livingproof/extra-ca.crt,'
         'type=bind,readonly',
     ]
     assert config['postCreateCommand'] == (
@@ -56,6 +58,12 @@ def test_development_entrypoint_sets_ca_only_in_that_stage():
     runtime = _stage('runtime')
     assert 'COPY docker/dev-ca-env.sh docker/dev-entrypoint.sh /usr/local/bin/' in development
     assert 'COPY docker/livingproof-ca.sh /etc/profile.d/livingproof-ca.sh' in development
+    script = (ROOT / 'docker/dev-ca-env.sh').read_text()
+    assert '/run/livingproof/extra-ca.crt' in script
+    assert '/tmp/livingproof-ca-bundle.crt' not in script
+    assert 'mktemp' in script
+    assert 'GIT_SSL_CAINFO' in script
+    assert 'chmod' not in script
     assert 'ENTRYPOINT ["/usr/local/bin/dev-entrypoint.sh"]' in development
     assert 'ENTRYPOINT ["livingproof"]' in runtime
     assert 'dev-ca-env.sh' not in runtime
@@ -134,8 +142,8 @@ def test_entrypoint_drops_empty_proxies_and_keeps_set_ones(tmp_path):
     assert 'http_proxy' not in values
     assert values['HTTPS_PROXY'] == 'http://proxy.example:8080'
     assert values['https_proxy'] == 'http://proxy.example:8080'
-    assert values['NO_PROXY'] == 'localhost'
-    assert values['no_proxy'] == 'localhost'
+    assert values['NO_PROXY'] == 'localhost,127.0.0.1,::1'
+    assert values['no_proxy'] == 'localhost,127.0.0.1,::1'
     for variable in CA_ENV:
         assert variable not in values
 
@@ -148,3 +156,73 @@ def test_supplied_ca_fails_when_the_system_bundle_cannot_be_read(tmp_path):
     assert 'SSL_CERT_FILE' not in values
     assert not (tmp_path / 'combined.pem').exists()
     assert 'cannot build a certificate bundle' in result.stderr
+
+
+def _proxy_names(value):
+    return [item for item in value.split(',') if item]
+
+
+def test_loopback_is_added_only_when_a_proxy_is_set(tmp_path):
+    system = tmp_path / 'system.pem'
+    system.write_text('SYSTEM-CA-MARKER\n')
+    result, values = _run_entrypoint(
+        tmp_path / 'proxy', tmp_path / 'missing.crt', system,
+        proxy={'HTTPS_PROXY': 'http://proxy.example:8080'},
+    )
+    assert result.returncode == 0, result.stderr
+    assert _proxy_names(values['NO_PROXY']) == list(LOOPBACK)
+    assert values['no_proxy'] == values['NO_PROXY']
+    result, values = _run_entrypoint(tmp_path / 'direct', tmp_path / 'missing.crt', system)
+    assert result.returncode == 0, result.stderr
+    assert 'NO_PROXY' not in values
+    assert 'no_proxy' not in values
+
+
+def test_bundle_is_private_and_does_not_follow_a_symlink(tmp_path):
+    system = tmp_path / 'system.pem'
+    system.write_text('SYSTEM-CA-MARKER\n')
+    extra = tmp_path / 'extra.crt'
+    extra.write_text(PEM)
+    victim = tmp_path / 'victim.pem'
+    victim.write_text('VICTIM-SECRET\n')
+    planted = Path('/tmp/livingproof-ca-bundle.crt')
+    planted_existed = planted.exists() or planted.is_symlink()
+    home = tmp_path / 'home'
+    home.mkdir()
+    link = tmp_path / 'link.pem'
+    link.symlink_to(victim)
+    env = {
+        'PATH': os.environ['PATH'],
+        'HOME': str(home),
+        'TMPDIR': str(tmp_path),
+        'DEV_EXTRA_CA': str(extra),
+        'DEV_SYSTEM_CA_BUNDLE': str(system),
+        'DEV_COMBINED_CA_BUNDLE': str(link),
+    }
+    try:
+        if not planted_existed:
+            if planted.exists() or planted.is_symlink():
+                planted.unlink()
+            planted.symlink_to(victim)
+        result = subprocess.run(
+            ['sh', str(ROOT / 'docker/dev-entrypoint.sh'), 'env'],
+            cwd=tmp_path, capture_output=True, text=True, env=env, check=False,
+        )
+    finally:
+        if not planted_existed and (planted.is_symlink() or planted.exists()):
+            planted.unlink()
+    assert result.returncode == 0, result.stderr
+    assert victim.read_text() == 'VICTIM-SECRET\n'
+    values = {}
+    for line in result.stdout.splitlines():
+        key, separator, value = line.partition('=')
+        if separator:
+            values[key] = value
+    bundle = Path(values['SSL_CERT_FILE'])
+    assert bundle != link and bundle != planted
+    assert not bundle.is_symlink()
+    assert bundle.stat().st_mode & 0o777 == 0o600
+    assert bundle.parent.stat().st_mode & 0o777 == 0o700
+    assert 'SYSTEM-CA-MARKER' in bundle.read_text()
+    assert 'EXTRA-CA' in bundle.read_text()
+    assert values['GIT_SSL_CAINFO'] == str(bundle)
