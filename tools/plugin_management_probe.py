@@ -57,10 +57,19 @@ def assert_recent_listing(default_stdout, wider_stdout):
         assert wider_tags == default_tags
 
 
+def offline_env(base=None):
+    """Prove local commands stay offline even when the host excludes the dead proxy."""
+    env = dict(os.environ if base is None else base)
+    env.pop('NO_PROXY', None)
+    env.pop('no_proxy', None)
+    env['https_proxy'] = 'http://127.0.0.1:1'
+    env['HTTPS_PROXY'] = 'http://127.0.0.1:1'
+    return env
+
+
 def main(mode):
     # An unreachable proxy proves local status/help/completion never require network.
-    offline = {**os.environ, 'https_proxy': 'http://127.0.0.1:1',
-               'HTTPS_PROXY': 'http://127.0.0.1:1'}
+    offline = offline_env()
     run('livingproof', 'plugins', 'status', NAME, expected=1, env=offline)
     run('livingproof', 'capability', 'report', expected=1, env=offline)
     run('livingproof', '--help', env=offline)

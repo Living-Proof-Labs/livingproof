@@ -19,7 +19,7 @@
     "no_proxy": "${localEnv:no_proxy}"
   },
   "mounts": [
-    "source=${localEnv:DEV_CA_BUNDLE:/dev/null},target=/etc/ssl/certs/extra-ca.crt,type=bind,readonly"
+    "source=${localEnv:DEV_CA_BUNDLE:/dev/null},target=/run/livingproof/extra-ca.crt,type=bind,readonly"
   ],
   "postCreateCommand": ". /usr/local/bin/dev-ca-env.sh && task setup && livingproof --help",
   "customizations": {

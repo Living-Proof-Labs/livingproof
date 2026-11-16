@@ -21,9 +21,10 @@ RUN set -eu; \
     apt-get -o APT::Update::Error-Mode=any update; \
     apt-get install -y --no-install-recommends bash ca-certificates curl git dpkg-dev; \
     rm -rf /var/lib/apt/lists/*
-# Runtime certificate for uv and Python builds. Exported only when the mounted
-# PEM at /etc/ssl/certs/extra-ca.crt contains a certificate. This is separate
-# from the BuildKit secret `ca`, which applies only to the Task download below.
+# Runtime certificate for uv, git and Python builds. Exported only when the
+# mounted PEM contains a certificate. The mount is outside the system
+# certificate directory. This is separate from the BuildKit secret `ca`, which
+# applies only to the Task download below.
 COPY docker/dev-ca-env.sh docker/dev-entrypoint.sh /usr/local/bin/
 COPY docker/livingproof-ca.sh /etc/profile.d/livingproof-ca.sh
 RUN chmod 755 /usr/local/bin/dev-ca-env.sh /usr/local/bin/dev-entrypoint.sh \
@@ -38,7 +39,8 @@ RUN --mount=type=secret,id=ca,required=false set -eu; \
     tar -xzf "task_linux_${arch}.tar.gz" task; \
     install task /usr/local/bin/task; rm -rf /tmp/task
 RUN useradd --create-home --uid 1000 --shell /bin/bash vscode
-RUN mkdir -p /opt/livingproof-dev && chmod 1777 /opt/livingproof-dev
+RUN mkdir -p /opt/livingproof-dev /run/livingproof \
+ && chmod 1777 /opt/livingproof-dev && chmod 755 /run/livingproof
 ENV UV_PROJECT_ENVIRONMENT=/opt/livingproof-dev/venv UV_CACHE_DIR=/tmp/livingproof-uv-cache
 ENV PATH="/opt/livingproof-dev/venv/bin:${PATH}"
 WORKDIR /workspace/livingproof
