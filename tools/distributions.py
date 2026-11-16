@@ -14,6 +14,44 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCH = {"x86_64": "amd64", "aarch64": "arm64"}[platform.machine()]
 
 
+def registry_runtime_packages(lock):
+    """Registry wheels for the root package's runtime dependencies.
+
+    The reporter wheelhouse is extracted first and can carry an older copy of
+    the same distribution. Staging replaces that copy with the locked wheel.
+    URL-sourced dependencies such as livingproof-common are fetched separately.
+    """
+    root = next(package for package in lock["package"] if package["name"] == "livingproof")
+    names = {item["name"] for item in root["dependencies"]}
+    return [package for package in lock["package"]
+            if package["name"] in names and "registry" in package.get("source", {})]
+
+
+def _fetch_wheel(url):
+    with urlopen(url, timeout=60) as response:
+        return response.read()
+
+
+def _wheel_distribution(filename):
+    return filename.split("-", 1)[0]
+
+
+def stage_locked_runtime_wheels(lock, wheels, fetch=_fetch_wheel):
+    """Write locked runtime wheels, replacing any other version already present."""
+    wheels = Path(wheels)
+    for package in registry_runtime_packages(lock):
+        asset, = package["wheels"]
+        content = fetch(asset["url"])
+        if "sha256:" + hashlib.sha256(content).hexdigest() != asset["hash"]:
+            raise ValueError(f"Locked {package['name']} wheel checksum mismatch")
+        filename = asset["url"].rsplit("/", 1)[1]
+        distribution = _wheel_distribution(filename)
+        for existing in list(wheels.glob("*.whl")):
+            if _wheel_distribution(existing.name) == distribution and existing.name != filename:
+                existing.unlink()
+        (wheels / filename).write_bytes(content)
+
+
 def build():
     subprocess.run(["python", "tools/fetch_reporter.py", "--distributions"], cwd=ROOT, check=True)
     wheel, = (ROOT / "dist").glob("livingproof-*.whl")
@@ -24,15 +62,10 @@ def build():
     shutil.copyfile(wheel, ROOT / "dist/wheels" / wheel.name)
     common = ROOT / "dist/livingproof_common-1.0.0-py3-none-any.whl"
     shutil.copyfile(common, ROOT / "dist/wheels" / common.name)
-    # Root runtime dependency, independent of the reporter's wheelhouse.
+    # Reporter wheelhouse copies of root runtime dependencies are replaced with
+    # the locked wheels. livingproof-common was copied above from its reviewed release.
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
-    package, = [p for p in lock['package'] if p['name'] == 'packaging']
-    asset, = package['wheels']
-    with urlopen(asset['url'], timeout=60) as response:
-        content = response.read()
-    if 'sha256:' + hashlib.sha256(content).hexdigest() != asset['hash']:
-        raise ValueError('Locked packaging wheel checksum mismatch')
-    (ROOT / 'dist/wheels' / asset['url'].rsplit('/', 1)[1]).write_bytes(content)
+    stage_locked_runtime_wheels(lock, ROOT / "dist/wheels")
     extra = []
     if os.environ.get("PACKAGE_NETWORK"):
         extra += ["--network", os.environ["PACKAGE_NETWORK"]]
