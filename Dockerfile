@@ -13,18 +13,30 @@ ARG TASK_VERSION=3.54.0
 # ca-certificates. APT_MIRROR replaces the deb.debian.org origin for both the
 # main and security suites (e.g. https://cloudfront.debian.net behind a proxy
 # that breaks deb.debian.org). Failed index downloads stop the build.
+# Behind a TLS-intercepting proxy, the optional BuildKit secret `ca` (the same one
+# the Task download uses) is appended to the system bundle for apt only, in a
+# temporary file that is removed before the layer is written. Readable by _apt,
+# which runs the HTTPS downloads. Without the secret apt runs unchanged.
 ARG APT_MIRROR=
-RUN set -eu; \
+RUN --mount=type=secret,id=ca,required=false set -eu; \
+    apt_ca=; bundle=; \
+    if [ -s /run/secrets/ca ]; then \
+      bundle="$(mktemp)"; \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/ca > "$bundle"; \
+      chmod 644 "$bundle"; \
+      apt_ca="-o Acquire::https::CAInfo=$bundle"; \
+    fi; \
     mirror="${APT_MIRROR:-https://deb.debian.org}"; \
     sed -i -E "s#^URIs: https?://deb\.debian\.org/#URIs: ${mirror%/}/#" /etc/apt/sources.list.d/debian.sources; \
     grep '^URIs:' /etc/apt/sources.list.d/debian.sources; \
-    apt-get -o APT::Update::Error-Mode=any update; \
-    apt-get install -y --no-install-recommends bash ca-certificates curl git dpkg-dev; \
+    apt-get $apt_ca -o APT::Update::Error-Mode=any update; \
+    apt-get $apt_ca install -y --no-install-recommends bash ca-certificates curl git dpkg-dev; \
+    rm -f "$bundle"; \
     rm -rf /var/lib/apt/lists/*
 # Runtime certificate for uv, git and Python builds. Exported only when the
 # mounted PEM contains a certificate. The mount is outside the system
 # certificate directory. This is separate from the BuildKit secret `ca`, which
-# applies only to the Task download below.
+# applies only to the image build (apt above and the Task download below).
 COPY docker/dev-ca-env.sh docker/dev-entrypoint.sh /usr/local/bin/
 COPY docker/livingproof-ca.sh /etc/profile.d/livingproof-ca.sh
 RUN chmod 755 /usr/local/bin/dev-ca-env.sh /usr/local/bin/dev-entrypoint.sh \
