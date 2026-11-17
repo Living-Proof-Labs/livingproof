@@ -299,6 +299,15 @@ def inspect_plugin(name):
     version_text = version if version is not None else 'version unavailable'
     try:
         all_entries = metadata.entry_points(group='livingproof.capability.commands')
+        entries = [e for e in all_entries if e.name == entry_name]
+        owner = entries[0].dist if len(entries) == 1 else None
+        owner_name = None
+        if owner:
+            owner_name = owner.name
+            if not isinstance(owner_name, str) or not owner_name.strip():
+                raise ValueError(f'{entry_name} entry point owner has missing or invalid Name metadata')
+            owner_name = canonicalize_name(owner_name)
+        valid_owner = len(entries) == 1 and bool(owner) and owner_name == name
     except Exception as exc:
         return PluginStatus(
             name=name,
@@ -306,8 +315,7 @@ def inspect_plugin(name):
             version=version,
             detail=f'Cannot inspect entry points for {name}: {type(exc).__name__}: {exc}',
         )
-    entries = [e for e in all_entries if e.name == entry_name]
-    if len(entries) != 1 or not entries[0].dist or canonicalize_name(entries[0].dist.name) != name:
+    if not valid_owner:
         return PluginStatus(
             name=name,
             state='unusable',
