@@ -454,3 +454,263 @@ def test_api_error_does_not_log_token_or_response_details(monkeypatch):
     assert 'rate limit or access restriction' in result.output
     assert token not in result.output
     assert 'Authorization' not in result.output
+
+
+def test_status_help_documents_overview_and_named_use(monkeypatch):
+    monkeypatch.setattr(pm, 'request', lambda url: pytest.fail('unexpected network'))
+    result = CliRunner().invoke(main, ['plugins', 'status', '--help'])
+    assert result.exit_code == 0
+    assert f'[{pm.REPORTER}]' in result.output
+    assert 'Without NAME' in result.output
+    assert 'With NAME' in result.output
+
+
+def test_common_dependency_is_excluded_from_recognized_plugins(monkeypatch):
+    assert pm.COMMON in pm.REGISTRY
+    assert pm.COMMON not in pm.RECOGNIZED_PLUGINS
+    monkeypatch.setattr(pm, 'request', lambda url: pytest.fail('unexpected network'))
+    for action in ('status', 'install', 'versions'):
+        assert CliRunner().invoke(main, ['plugins', action, pm.COMMON]).exit_code == 2
+
+
+def test_status_overview_all_missing_offline_exits_zero(monkeypatch):
+    def absent(name):
+        raise pm.metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(pm.metadata, 'distribution', absent)
+    monkeypatch.setattr(pm, 'request', lambda url: pytest.fail('unexpected network'))
+    monkeypatch.setattr(pm, 'install', lambda *args, **kwargs: pytest.fail('unexpected install'))
+    result = CliRunner().invoke(main, ['plugins', 'status'])
+    assert result.exit_code == 0
+    assert result.output == f'{pm.REPORTER}: not installed\n'
+
+
+def test_status_overview_and_named_installed_version(monkeypatch):
+    import click
+
+    @click.command()
+    def report_cmd():
+        pass
+
+    dist = SimpleNamespace(version='3.0.1', name=pm.REPORTER)
+    ep = SimpleNamespace(name='report', dist=dist, load=lambda: report_cmd)
+    monkeypatch.setattr(pm.metadata, 'distribution', lambda name: dist)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [ep])
+    monkeypatch.setattr(pm, 'request', lambda url: pytest.fail('unexpected network'))
+
+    overview = CliRunner().invoke(main, ['plugins', 'status'])
+    assert overview.exit_code == 0
+    assert overview.output == f'{pm.REPORTER}: installed (3.0.1)\n'
+
+    named = CliRunner().invoke(main, ['plugins', 'status', pm.REPORTER])
+    assert named.exit_code == 0
+    assert named.output == f'{pm.REPORTER} 3.0.1\n'
+
+
+def test_status_overview_mixed_plugins_in_sorted_order(monkeypatch):
+    import click
+
+    @click.command()
+    def cmd():
+        pass
+
+    monkeypatch.setattr(pm, 'RECOGNIZED_PLUGINS', {
+        'zebra-plugin': 'zebra',
+        'alpha-plugin': 'alpha',
+    })
+    alpha_dist = SimpleNamespace(version='2.1.0', name='alpha-plugin')
+    alpha_ep = SimpleNamespace(name='alpha', dist=alpha_dist, load=lambda: cmd)
+
+    def distribution(name):
+        if name == 'alpha-plugin':
+            return alpha_dist
+        raise pm.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(pm.metadata, 'distribution', distribution)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [alpha_ep])
+    monkeypatch.setattr(pm, 'request', lambda url: pytest.fail('unexpected network'))
+
+    result = CliRunner().invoke(main, ['plugins', 'status'])
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        'alpha-plugin: installed (2.1.0)',
+        'zebra-plugin: not installed',
+    ]
+
+
+@pytest.mark.parametrize('raw_version', [None, '', '   '])
+def test_status_explicit_when_version_metadata_unavailable(monkeypatch, raw_version):
+    import click
+
+    @click.command()
+    def report_cmd():
+        pass
+
+    dist = SimpleNamespace(version=raw_version, name=pm.REPORTER)
+    ep = SimpleNamespace(name='report', dist=dist, load=lambda: report_cmd)
+    monkeypatch.setattr(pm.metadata, 'distribution', lambda name: dist)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [ep])
+
+    overview = CliRunner().invoke(main, ['plugins', 'status'])
+    assert overview.exit_code == 0
+    assert overview.output == f'{pm.REPORTER}: installed (version unavailable)\n'
+
+    named = CliRunner().invoke(main, ['plugins', 'status', pm.REPORTER])
+    assert named.exit_code == 0
+    assert named.output == f'{pm.REPORTER} version unavailable\n'
+
+
+def test_status_overview_unusable_plugin_reports_all_rows_and_exits_one(monkeypatch):
+    monkeypatch.setattr(pm, 'RECOGNIZED_PLUGINS', {
+        'alpha-plugin': 'alpha',
+        pm.REPORTER: 'report',
+    })
+    reporter_dist = SimpleNamespace(version='3.0.1', name=pm.REPORTER)
+
+    def distribution(name):
+        if name == pm.REPORTER:
+            return reporter_dist
+        raise pm.metadata.PackageNotFoundError(name)
+
+    broken_ep = SimpleNamespace(
+        name='report',
+        dist=reporter_dist,
+        load=lambda: (_ for _ in ()).throw(ImportError('missing dep')),
+    )
+    monkeypatch.setattr(pm.metadata, 'distribution', distribution)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [broken_ep])
+
+    result = CliRunner().invoke(main, ['plugins', 'status'])
+    assert result.exit_code == 1
+    assert 'alpha-plugin: not installed' in result.output
+    assert f'{pm.REPORTER}: unusable (3.0.1)' in result.output
+    assert 'missing dep' in result.output
+
+
+def test_status_inspection_error_is_not_reported_as_not_installed(monkeypatch):
+    def broken_distribution(name):
+        raise PermissionError('unreadable dist-info')
+
+    monkeypatch.setattr(pm.metadata, 'distribution', broken_distribution)
+
+    overview = CliRunner().invoke(main, ['plugins', 'status'])
+    assert overview.exit_code == 1
+    assert 'not installed' not in overview.output
+    assert 'inspection error' in overview.output
+    assert 'unreadable dist-info' in overview.output
+
+    named = CliRunner().invoke(main, ['plugins', 'status', pm.REPORTER])
+    assert named.exit_code == 1
+    assert 'not installed' not in named.output
+    assert 'unreadable dist-info' in named.output
+
+
+def test_status_entry_points_inspection_error(monkeypatch):
+    dist = SimpleNamespace(version='3.0.1', name=pm.REPORTER)
+    monkeypatch.setattr(pm.metadata, 'distribution', lambda name: dist)
+    monkeypatch.setattr(
+        pm.metadata,
+        'entry_points',
+        lambda **kw: (_ for _ in ()).throw(RuntimeError('corrupt entry_points.txt')),
+    )
+
+    result = CliRunner().invoke(main, ['plugins', 'status'])
+    assert result.exit_code == 1
+    assert 'inspection error' in result.output
+    assert 'corrupt entry_points.txt' in result.output
+
+
+def test_status_overview_empty_registry(monkeypatch):
+    monkeypatch.setattr(pm, 'RECOGNIZED_PLUGINS', {})
+    result = CliRunner().invoke(main, ['plugins', 'status'])
+    assert result.exit_code == 0
+    assert result.output == 'No recognized plugins are configured.\n'
+
+
+
+@pytest.mark.parametrize('broken_field', ['missing_name', 'raising_name', 'raising_dist'])
+def test_status_owner_inspection_error_preserves_other_rows(monkeypatch, broken_field):
+    import click
+
+    class UnreadableOwner:
+        @property
+        def name(self):
+            raise PermissionError('unreadable owner metadata')
+
+    class UnreadableEntry:
+        name = 'report'
+
+        @property
+        def dist(self):
+            raise PermissionError('unreadable owner distribution')
+
+    owner = SimpleNamespace(name=None) if broken_field == 'missing_name' else UnreadableOwner()
+    broken = (UnreadableEntry() if broken_field == 'raising_dist' else
+              SimpleNamespace(name='report', dist=owner))
+    good_dist = SimpleNamespace(name='zebra-plugin', version='2.1.0')
+    good = SimpleNamespace(name='zebra', dist=good_dist, load=lambda: click.Command('zebra'))
+    monkeypatch.setattr(pm, 'RECOGNIZED_PLUGINS', {
+        'zebra-plugin': 'zebra', pm.REPORTER: 'report', 'alpha-plugin': 'alpha',
+    })
+
+    def distribution(name):
+        if name == 'alpha-plugin':
+            raise pm.metadata.PackageNotFoundError(name)
+        return good_dist if name == 'zebra-plugin' else SimpleNamespace(version='3.0.1')
+
+    monkeypatch.setattr(pm.metadata, 'distribution', distribution)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [broken, good])
+    monkeypatch.setattr(pm, 'request', lambda *a, **kw: pytest.fail('unexpected network'))
+    monkeypatch.setattr(pm, 'install', lambda *a, **kw: pytest.fail('unexpected install'))
+
+    status = pm.inspect_plugin(pm.REPORTER)
+    assert status.state == 'error'
+    assert status.version == '3.0.1'
+    diagnostic = 'missing or invalid Name' if broken_field == 'missing_name' else 'unreadable owner'
+    assert diagnostic in status.detail
+    overview = CliRunner().invoke(main, ['plugins', 'status'])
+    assert overview.exit_code == 1
+    assert isinstance(overview.exception, SystemExit)
+    rows = overview.output.splitlines()
+    assert rows[0] == 'alpha-plugin: not installed'
+    assert rows[1].startswith(f'{pm.REPORTER}: inspection error - ')
+    assert diagnostic in rows[1]
+    assert rows[2] == 'zebra-plugin: installed (2.1.0)'
+    assert 'reinstall the affected plugin' in overview.output
+    assert 'Traceback' not in overview.output
+
+    named = CliRunner().invoke(main, ['plugins', 'status', pm.REPORTER])
+    assert named.exit_code == 1
+    assert isinstance(named.exception, SystemExit)
+    assert diagnostic in named.output
+
+
+def test_status_entry_point_filtering_error(monkeypatch):
+    class UnreadableEntry:
+        @property
+        def name(self):
+            raise PermissionError('unreadable entry point name')
+
+    monkeypatch.setattr(pm.metadata, 'distribution', lambda name: SimpleNamespace(version='3.0.1'))
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: [UnreadableEntry()])
+    status = pm.inspect_plugin(pm.REPORTER)
+    assert status.state == 'error'
+    assert 'unreadable entry point name' in status.detail
+
+
+@pytest.mark.parametrize('entry_case', ['missing', 'ambiguous', 'no_owner', 'wrong_owner'])
+def test_status_unusable_entry_point_ownership_unchanged(monkeypatch, entry_case):
+    dist = SimpleNamespace(version='3.0.1', name=pm.REPORTER)
+    owner = None if entry_case == 'no_owner' else SimpleNamespace(name='other-plugin')
+    entry = SimpleNamespace(name='report', dist=owner,
+                            load=lambda: pytest.fail('unexpected entry point load'))
+    entries = [] if entry_case == 'missing' else [entry]
+    if entry_case == 'ambiguous':
+        entries.append(entry)
+    monkeypatch.setattr(pm.metadata, 'distribution', lambda name: dist)
+    monkeypatch.setattr(pm.metadata, 'entry_points', lambda **kw: entries)
+    status = pm.inspect_plugin(pm.REPORTER)
+    assert status.state == 'unusable'
+    assert 'missing or ambiguous' in status.detail
+    named = CliRunner().invoke(main, ['plugins', 'status', pm.REPORTER])
+    assert named.exit_code == 1
+    assert 'missing or ambiguous' in named.output

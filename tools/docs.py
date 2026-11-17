@@ -105,7 +105,7 @@ def stage():
         lines += [f"  {s['keyword']}{s['text']}" for s in scenario['steps']]
         lines += ['```', '']
     lines += ['Network installation/version flows, completion lifecycle, other platforms and',
-              'independent manual review remain outside these five acceptance examples.', '']
+              'independent manual review remain outside these acceptance examples.', '']
     (common / 'scenarios.md').write_text('\n'.join(lines))
     provenance = installed_evidence(common)
     (common / 'provenance.md').write_text(
@@ -167,7 +167,7 @@ def installed_evidence(guide):
         'architecture': arch,
         'scenario_source_sha256': hashlib.sha256(
             (ROOT / 'tests/features/installed.feature').read_bytes()).hexdigest(),
-        'result_scope': 'Five installed-user scenarios; not exhaustive feature coverage',
+        'result_scope': 'Bounded installed-user scenarios; not exhaustive feature coverage',
     }
     (guide / 'build.json').write_text(json.dumps(provenance, indent=2) + '\n')
     return provenance

@@ -271,6 +271,7 @@ livingproof plugins versions livingproof-capability-report
 livingproof plugins versions livingproof-capability-report --limit 120
 livingproof plugins install livingproof-capability-report --version 3.0.1 --dry-run
 livingproof plugins install livingproof-capability-report --version 3.0.1
+livingproof plugins status
 livingproof plugins status livingproof-capability-report
 ```
 
@@ -308,8 +309,11 @@ The Debian operation repairs missing dependencies using the supplied artifacts a
 refuses package removals. For a system install an administrator must explicitly run the command from the
 Debian installation with appropriate privileges. `--dry-run` downloads and verifies
 but does not install. Ordinary commands, help and completion never install or
-fetch anything. `status` reads local metadata and checks that the discovered plugin
-loads; it reports the actual package version, not a release lookup.
+fetch anything. `status` reads local metadata and checks that discovered plugins
+load; without an argument it lists every recognized plugin with its local
+installation status and version (exiting 0 even when plugins are not installed),
+and with a plugin name it reports that package's actual local version and exits 1
+when absent or unusable (never a release lookup).
 
 Exit codes are 0 for success, 1 for absent/broken plugins or operational failures,
 and 2 for invalid arguments. Release requests retry HTTP 502, 503 and 504 and
