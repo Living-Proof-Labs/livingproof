@@ -44,3 +44,21 @@ Feature: Use the installed Living Proof Labs command home
     And the output contains "Usage:"
     And the output contains "--help"
     And the output contains "does not exist"
+
+  Scenario: Plugin status overview reports missing plugins offline
+    Given the root-only installed image
+    When I run "livingproof plugins status"
+    Then the exit status is 0
+    And the output contains "livingproof-capability-report: not installed"
+    When I run "livingproof plugins status livingproof-capability-report"
+    Then the exit status is 1
+    And the output contains "not installed"
+
+  Scenario: Plugin status overview reports installed plugin versions offline
+    Given the reporting installed image
+    When I run "livingproof plugins status"
+    Then the exit status is 0
+    And the output contains "livingproof-capability-report: installed ("
+    When I run "livingproof plugins status livingproof-capability-report"
+    Then the exit status is 0
+    And the output contains "livingproof-capability-report "

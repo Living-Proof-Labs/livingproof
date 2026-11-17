@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Explicit, checksum-verified installation from known release repositories."""
+from dataclasses import dataclass
 import email
 import hashlib
 from importlib import metadata
@@ -29,6 +30,9 @@ REPORTER = 'livingproof-capability-report'
 COMMON = 'livingproof-common'
 REGISTRY = {REPORTER: ('Living-Proof-Labs/livingproof-capability-report', REPORTER),
             COMMON: ('Living-Proof-Labs/livingproof-common', 'python3-livingproof-common')}
+# Recognized CLI plugins and their expected entry-point name; excludes non-plugin
+# downloadable dependencies such as livingproof-common.
+RECOGNIZED_PLUGINS = {REPORTER: 'report'}
 # Gateway responses and dropped connections only. Four attempts; delays double
 # from the base, each delay is capped, and the waits stay under the total cap.
 TRANSIENT_STATUS = frozenset({502, 503, 504})
@@ -251,21 +255,108 @@ def inspect(path, name, rel, mode):
     return version, pin
 
 
-def installed(name):
+@dataclass(frozen=True)
+class PluginStatus:
+    name: str
+    state: str
+    version: str | None = None
+    detail: str | None = None
+
+
+def _distribution_version(dist):
+    try:
+        version = dist.version
+    except Exception:
+        return None
+    if not isinstance(version, str) or not version.strip():
+        return None
+    return version.strip()
+
+
+def inspect_plugin(name):
+    entry_name = RECOGNIZED_PLUGINS.get(name)
+    if not entry_name:
+        return PluginStatus(
+            name=name,
+            state='error',
+            detail=f'{name} is not a recognized plugin.',
+        )
     try:
         dist = metadata.distribution(name)
     except metadata.PackageNotFoundError:
-        fail(f'{name} is not installed. Run: livingproof plugins install {name}')
-    entries = [e for e in metadata.entry_points(group='livingproof.capability.commands')
-               if e.name == 'report']
+        return PluginStatus(
+            name=name,
+            state='not_installed',
+            detail=f'{name} is not installed. Run: livingproof plugins install {name}',
+        )
+    except Exception as exc:
+        return PluginStatus(
+            name=name,
+            state='error',
+            detail=f'Cannot inspect {name} package metadata: {type(exc).__name__}: {exc}',
+        )
+    version = _distribution_version(dist)
+    version_text = version if version is not None else 'version unavailable'
+    try:
+        all_entries = metadata.entry_points(group='livingproof.capability.commands')
+    except Exception as exc:
+        return PluginStatus(
+            name=name,
+            state='error',
+            version=version,
+            detail=f'Cannot inspect entry points for {name}: {type(exc).__name__}: {exc}',
+        )
+    entries = [e for e in all_entries if e.name == entry_name]
     if len(entries) != 1 or not entries[0].dist or canonicalize_name(entries[0].dist.name) != name:
-        fail(f'{name} package {dist.version} exists but its report entry point is missing or ambiguous.')
+        return PluginStatus(
+            name=name,
+            state='unusable',
+            version=version,
+            detail=f'{name} ({version_text}) exists but its {entry_name} entry point is missing or ambiguous.',
+        )
     try:
         if not isinstance(entries[0].load(), click.Command):
             raise TypeError('entry point is not a Click command')
     except Exception as exc:
-        fail(f'{name} package {dist.version} is installed but unusable: {exc}')
-    return dist.version
+        return PluginStatus(
+            name=name,
+            state='unusable',
+            version=version,
+            detail=f'{name} ({version_text}) is installed but unusable: {exc}',
+        )
+    return PluginStatus(name=name, state='installed', version=version)
+
+
+def format_status_row(status):
+    version_text = status.version if status.version is not None else 'version unavailable'
+    if status.state == 'installed':
+        return f'{status.name}: installed ({version_text})'
+    if status.state == 'not_installed':
+        return f'{status.name}: not installed'
+    if status.state == 'unusable':
+        return f'{status.name}: unusable ({version_text}) - {status.detail}'
+    return f'{status.name}: inspection error - {status.detail}'
+
+
+def status_overview():
+    if not RECOGNIZED_PLUGINS:
+        click.echo('No recognized plugins are configured.')
+        return
+    statuses = [inspect_plugin(name) for name in sorted(RECOGNIZED_PLUGINS)]
+    for item in statuses:
+        click.echo(format_status_row(item))
+    problems = [item for item in statuses if item.state in ('unusable', 'error')]
+    if problems:
+        names = ', '.join(item.name for item in problems)
+        fail(f'Plugin inspection failed or found unusable plugins: {names}. '
+             'Inspect the environment or reinstall the affected plugin.')
+
+
+def installed(name):
+    status = inspect_plugin(name)
+    if status.state != 'installed':
+        fail(status.detail)
+    return status.version if status.version is not None else 'version unavailable'
 
 
 def install(name, version, dry_run=False):
@@ -339,7 +430,7 @@ def plugins():
 
 
 @plugins.command('install')
-@click.argument('name', type=click.Choice([REPORTER]))
+@click.argument('name', type=click.Choice(tuple(RECOGNIZED_PLUGINS)))
 @click.option('--version', help='Exact published version (optional v prefix); default: latest stable.')
 @click.option('--dry-run', is_flag=True, help='Download and verify the full plan without installing.')
 def install_command(name, version, dry_run):
@@ -356,14 +447,27 @@ def install_command(name, version, dry_run):
 
 
 @plugins.command()
-@click.argument('name', type=click.Choice([REPORTER]))
+@click.argument('name', required=False, type=click.Choice(tuple(RECOGNIZED_PLUGINS)))
 def status(name):
-    """Print the usable installed package version locally; exit 1 when absent/broken."""
+    """Show local status for all recognized plugins, or one named plugin.
+
+    Without NAME, lists every recognized plugin with its local installation
+    status and installed version (exits 0 even when plugins are not installed;
+    exits 1 if a plugin is unusable or inspection fails).
+
+    With NAME, prints the usable installed package version for that plugin
+    and exits 1 when it is absent or unusable.
+
+    Local and read-only; never installs packages or queries the network.
+    """
+    if name is None:
+        status_overview()
+        return
     click.echo(f'{name} {installed(name)}')
 
 
 @plugins.command()
-@click.argument('name', type=click.Choice([REPORTER]))
+@click.argument('name', type=click.Choice(tuple(RECOGNIZED_PLUGINS)))
 @click.option('--limit', default=20, show_default=True, type=click.IntRange(min=1),
               help='Maximum releases; automatically traverse API pages.')
 def versions(name, limit):

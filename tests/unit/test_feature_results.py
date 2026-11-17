@@ -26,7 +26,7 @@ def test_failed_skipped_and_incomplete_results_remain_visible(tmp_path):
     path = tmp_path / 'results.xml'
     ET.ElementTree(suite).write(path)
     actual = reporter.results(path)
-    assert [r['status'] for r in actual] == ['PASS', 'FAIL', 'ERROR', 'SKIPPED', 'NOT_RUN']
+    assert [r['status'] for r in actual] == ['PASS', 'FAIL', 'ERROR', 'SKIPPED'] + ['NOT_RUN'] * (len(rows) - 4)
     assert '| FAIL |' in reporter.markdown(actual)
 
 
