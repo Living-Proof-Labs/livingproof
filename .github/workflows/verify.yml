@@ -42,10 +42,11 @@ jobs:
           name: devcontainer-tests
           path: artifacts/devcontainer-tests.xml
   documentation:
-    needs: [verify, development]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [release, assets, publish]
+    if: needs.release.outputs.draft-created == 'true' && needs.publish.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
       pages: write
       id-token: write
     concurrency:
@@ -54,7 +55,19 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release.outputs.git-tag }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Require release tag to match the exact verified commit
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
       - name: Check current main inside the deployment lock
         id: freshness
         shell: bash
@@ -73,11 +86,11 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Skipping stale documentation run $GITHUB_SHA; main is $current_main." >> "$GITHUB_STEP_SUMMARY"
           fi
-      # Same run/commit as the successful verification jobs; never a PR artifact.
+      # Same run/commit as the successful release jobs; never a PR or 0.0.0 candidate artifact.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: steps.freshness.outputs.current == 'true'
         with:
-          name: documentation-0.0.0-amd64
+          name: documentation-${{ needs.release.outputs.version }}-amd64
           path: documentation
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
         if: steps.freshness.outputs.current == 'true'
