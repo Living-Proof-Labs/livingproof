@@ -38,3 +38,23 @@ and never retarget published tags or overwrite public assets. Generated release
 notes stay on GitHub. Follow the
 [shared release procedure](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v4.0.0/docs/releases.md).
 Old wheel/source-only releases remain unchanged. No PyPI publication is configured.
+
+## Released manual delivery
+
+The unversioned verification and draft package builds produce development previews.
+After package/image finalization and public consumption pass, the read-only stable-manual job
+checks out the exact release tag, verifies equality with the verified workflow commit,
+and requires a published, stable, immutable release. It rebuilds the manual using the
+tested versioned wheel, saved images and scenario results, then runs browser checks.
+The visible manual identity and build record contain the same release version and tag.
+Pages retains its serialized current-main check; stale runs cannot replace it.
+
+For a delivery-only failure, rerun the failed documentation job from the original
+successful release run while its one-day Pages artifact still exists. If the
+builder failed, rerun that failed job while its 14-day package and scenario
+artifacts exist; each builder attempt creates a distinct Pages artifact.
+Builder recovery reads the same release and tag without rerunning semantic-release or uploading
+release assets. Expired artifacts, an unavailable release, a dirty source tree or a
+mismatched tag/version/commit fail closed. Recover draft package/image failures using
+the existing procedure above; do not retag or republish to repair documentation.
+No tags are backfilled and no existing release assets are changed by this migration.

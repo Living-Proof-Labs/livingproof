@@ -16,6 +16,7 @@ import yaml
 from feature_results import ROOT, results, scenarios
 from docs_compatibility import preserve_urls
 from docs_portal import task_reference, add_identity
+from released_manual import identity as manual_identity
 
 OUTPUT = ROOT / 'artifacts/docs'
 # Explicit source allowlist: no source checkout is exposed as a web root.
@@ -110,15 +111,14 @@ def stage():
     provenance = installed_evidence(common)
     (common / 'provenance.md').write_text(
         '# Build and verification provenance\n\n'
-        'This manual records the candidate artifacts and scenario result snapshot. Skipped or missing results do not establish passing behavior.\n'
-        'Package version 0.0.0 identifies a CI candidate, not a published release.\n\n'
-        f"[Source revision]({provenance['source_url']})\n\n"
+        + (f"Released manual **{provenance['release_tag']}** from its immutable tag and published version.\n\n"
+           if provenance['channel'] == 'release' else
+           'Development preview: candidate packages and results are not a stable release manual.\n\n')
+        + f"[Source revision]({provenance['source_url']})\n\n"
         + (f"[Verification run]({provenance['workflow_run']})\n\n"
            if provenance['workflow_run'] else 'Local snapshot; no hosted verification run.\n\n')
-        + 'This is the current development manual, not a stable package release manual.\n'
         + 'Historical rendered manuals are not maintained; consult [source release tags](https://github.com/Living-Proof-Labs/livingproof/tags).\n'
         + 'Review artifacts expire after 14 days; that does not remove the hosted manual.\n'
-        + '[Published package releases](https://github.com/Living-Proof-Labs/livingproof/releases) are separate from this documentation revision and candidate metadata.\n'
         + 'No line coverage is measured by this manual, and no private security reporting route is established here.\n\n'
         + '```json\n' + json.dumps(provenance, indent=2) + '\n```\n\n'
         + '[Build record](build.json) | [Scenario outcomes](feature-results.json)\n')
@@ -156,6 +156,7 @@ def installed_evidence(guide):
     commit = run(['git', 'rev-parse', 'HEAD'], cwd=ROOT).strip()
     repository = 'Living-Proof-Labs/livingproof'
     provenance = {
+        **manual_identity(version, commit, wheel),
         'source_commit': commit,
         'source_dirty': bool(run(['git', 'status', '--porcelain'], cwd=ROOT).strip()),
         'source_url': f'https://github.com/{repository}/tree/{commit}',

@@ -41,9 +41,107 @@ jobs:
         with:
           name: devcontainer-tests
           path: artifacts/devcontainer-tests.xml
+  stable-manual:
+    needs: [release, assets, publish, consume-public]
+    if: needs.release.outputs.draft-created == 'true' && needs.publish.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.pages.outputs.artifact-id }}
+      artifact-name: ${{ steps.package.outputs.artifact-name }}
+      artifact-attempt: ${{ steps.package.outputs.artifact-attempt }}
+      tar-sha256: ${{ steps.package.outputs.tar-sha256 }}
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.git-tag }}
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.release.outputs.git-tag }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Require the published immutable release at the verified commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/released_manual.py published
+      # Same run/commit as the successful release jobs; never a PR or 0.0.0 candidate artifact.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: documentation-${{ needs.release.outputs.version }}-amd64
+          path: downloaded/documentation
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: packages-${{ needs.release.outputs.version }}-amd64
+          path: dist
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: '0.12.23'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+        with:
+          version: '3.54.0'
+      - name: Rebuild the released manual from checked source and tested packages
+        env:
+          MANUAL_CHANNEL: release
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum --ignore-missing -c SHA256SUMS-amd64)
+          docker load -i dist/image-amd64.tar
+          docker load -i dist/reporting-image-amd64.tar
+          mkdir -p artifacts
+          cp downloaded/documentation/feature-tests.xml artifacts/feature-tests.xml
+          task setup
+          task docs
+          task docs:test:setup
+          uv run --locked --no-sync --group docs-test playwright install --with-deps chromium
+          task test:docs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: released-manual-${{ needs.release.outputs.version }}-amd64
+          overwrite: true
+          path: |
+            artifacts/docs/html/
+            artifacts/docs/screenshots/
+            artifacts/docs-tests.xml
+          if-no-files-found: error
+          retention-days: 14
+      - name: Package the verified HTML for Pages
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/docs/html/index.html
+          test -f artifacts/docs/html/build.json
+          test -f artifacts/docs/html/feature-results.json
+          python - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          site = Path('artifacts/docs/html')
+          provenance = json.loads((site / 'build.json').read_text())
+          assert provenance['source_commit'] == os.environ['GITHUB_SHA']
+          assert provenance['source_dirty'] is False
+          assert provenance['channel'] == 'release'
+          assert provenance['version'] == os.environ['RELEASE_VERSION']
+          assert provenance['release_tag'] == os.environ['RELEASE_TAG']
+          assert provenance['root_wheel_sha256'] == provenance['release_wheel_sha256']
+          outcomes = json.loads((site / 'feature-results.json').read_text())
+          assert outcomes and all(row['status'] == 'PASS' for row in outcomes)
+          PYTHON
+          tar --dereference --hard-dereference -C artifacts/docs/html -cf "$RUNNER_TEMP/artifact.tar" .
+          digest=$(sha256sum "$RUNNER_TEMP/artifact.tar")
+          echo "tar-sha256=${digest%% *}" >> "$GITHUB_OUTPUT"
+          echo "artifact-name=github-pages-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "artifact-attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        id: pages
+        with:
+          name: ${{ steps.package.outputs.artifact-name }}
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
   documentation:
-    needs: [verify, development]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: stable-manual
     runs-on: ubuntu-24.04
     permissions:
       pages: write
@@ -54,8 +152,78 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      MANUAL_ID: ${{ needs.stable-manual.outputs.artifact-id }}
+      MANUAL_NAME: ${{ needs.stable-manual.outputs.artifact-name }}
+      MANUAL_ATTEMPT: ${{ needs.stable-manual.outputs.artifact-attempt }}
+      MANUAL_DIGEST: ${{ needs.stable-manual.outputs.tar-sha256 }}
     steps:
-      - name: Check current main inside the deployment lock
+      - name: Require the successful builder's same-run artifact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$MANUAL_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$MANUAL_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$MANUAL_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$MANUAL_NAME" == "github-pages-${GITHUB_RUN_ID}-${MANUAL_ATTEMPT}" ]]
+          (( MANUAL_ATTEMPT <= GITHUB_RUN_ATTEMPT ))
+      - name: Read Pages artifact by id
+        id: read_id
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.stable-manual.outputs.artifact-id }}
+          path: ${{ runner.temp }}/released-manual-id
+          merge-multiple: true
+      - name: Read Pages artifact by id once more after failure
+        id: read_id_retry
+        if: steps.read_id.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.stable-manual.outputs.artifact-id }}
+          path: ${{ runner.temp }}/released-manual-id-retry
+          merge-multiple: true
+      - name: Read Pages artifact by name
+        id: read_name
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.stable-manual.outputs.artifact-name }}
+          path: ${{ runner.temp }}/released-manual-name
+      - name: Read Pages artifact by name once more after failure
+        id: read_name_retry
+        if: steps.read_name.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.stable-manual.outputs.artifact-name }}
+          path: ${{ runner.temp }}/released-manual-name-retry
+      - name: Verify both native readbacks without executing or extracting the tar
+        shell: bash
+        env:
+          ID_OUTCOME: ${{ steps.read_id.outcome }}
+          ID_RETRY_OUTCOME: ${{ steps.read_id_retry.outcome }}
+          NAME_OUTCOME: ${{ steps.read_name.outcome }}
+          NAME_RETRY_OUTCOME: ${{ steps.read_name_retry.outcome }}
+        run: |
+          set -euo pipefail
+          verify_readback() {
+            local kind="$1" outcome="$2" retry_outcome="$3" directory
+            if [[ "$outcome" == success ]]; then
+              directory="$RUNNER_TEMP/released-manual-$kind"
+            elif [[ "$outcome" == failure && "$retry_outcome" == success ]]; then
+              directory="$RUNNER_TEMP/released-manual-$kind-retry"
+            else
+              echo "::error::Pages artifact readback by $kind failed after at most one retry."
+              return 1
+            fi
+            printf '%s  %s\n' "$MANUAL_DIGEST" "$directory/artifact.tar" | sha256sum -c -
+          }
+          verify_readback id "$ID_OUTCOME" "$ID_RETRY_OUTCOME"
+          verify_readback name "$NAME_OUTCOME" "$NAME_RETRY_OUTCOME"
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - name: Check freshest main immediately before deployment
         id: freshness
         shell: bash
         run: |
@@ -73,42 +241,12 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Skipping stale documentation run $GITHUB_SHA; main is $current_main." >> "$GITHUB_STEP_SUMMARY"
           fi
-      # Same run/commit as the successful verification jobs; never a PR artifact.
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        if: steps.freshness.outputs.current == 'true'
-        with:
-          name: documentation-0.0.0-amd64
-          path: documentation
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
-        if: steps.freshness.outputs.current == 'true'
-      - name: Package the verified HTML for Pages
-        if: steps.freshness.outputs.current == 'true'
-        run: |
-          test -f documentation/docs/html/index.html
-          test -f documentation/docs/html/build.json
-          test -f documentation/docs/html/feature-results.json
-          python - <<'PYTHON'
-          import json, os
-          from pathlib import Path
-          site = Path('documentation/docs/html')
-          provenance = json.loads((site / 'build.json').read_text())
-          assert provenance['source_commit'] == os.environ['GITHUB_SHA']
-          assert provenance['source_dirty'] is False
-          outcomes = json.loads((site / 'feature-results.json').read_text())
-          assert outcomes and all(row['status'] == 'PASS' for row in outcomes)
-          PYTHON
-          tar --dereference --hard-dereference -C documentation/docs/html -cf "$RUNNER_TEMP/artifact.tar" .
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: steps.freshness.outputs.current == 'true'
-        with:
-          name: github-pages
-          path: ${{ runner.temp }}/artifact.tar
-          retention-days: 1
-          if-no-files-found: error
       - name: Deploy the verified documentation
         if: steps.freshness.outputs.current == 'true'
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        with:
+          artifact_name: ${{ needs.stable-manual.outputs.artifact-name }}
   release:
     needs: [verify, development]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -126,6 +264,7 @@ jobs:
     uses: ./.github/workflows/packages.yml
     with:
       version: ${{ needs.release.outputs.version }}
+      release-tag: ${{ needs.release.outputs.git-tag }}
   publish:
     needs: [release, assets, registry-consumption]
     if: needs.release.outputs.draft-created == 'true'

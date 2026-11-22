@@ -6,6 +6,8 @@ import re
 import subprocess
 import textwrap
 
+import yaml
+
 import pytest
 
 WORKFLOW = Path(__file__).resolve().parents[2] / '.github/workflows/verify.yml'
@@ -27,8 +29,8 @@ def documentation_job():
     (CURRENT + '\trefs/heads/main', 128, None),
 ])
 def test_current_stale_and_unavailable_main(tmp_path, remote, exit_code, expected):
-    script = re.search(r'        run: \|\n(.*?)      # Same run',
-                       documentation_job(), re.S).group(1)
+    job = yaml.safe_load(WORKFLOW.read_text())['jobs']['documentation']
+    script = next(step['run'] for step in job['steps'] if step.get('id') == 'freshness')
     git = tmp_path / 'git'
     git.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$GIT_ARGS"\n'
                    'printf "%s\\n" "$REMOTE_REF"\nexit "$REMOTE_EXIT"\n')
@@ -61,7 +63,6 @@ def test_every_publication_step_requires_current_main():
     job = documentation_job()
     assert '    concurrency:\n      group: github-pages\n' in job
     steps = re.split(r'^      - ', job.split('    steps:\n', 1)[1], flags=re.M)[1:]
-    assert 'id: freshness' in steps[0]
-    assert len(steps[1:]) == 5
-    for step in steps[1:]:
+    freshness = next(i for i, step in enumerate(steps) if 'id: freshness' in step)
+    for step in steps[freshness + 1:]:
         assert "if: steps.freshness.outputs.current == 'true'" in step

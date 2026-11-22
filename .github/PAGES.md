@@ -1,29 +1,45 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Publish the verified documentation
 
-The `documentation` job in `verify.yml` publishes only after the existing package
-verification (both native builds and installed consumers) and development checks
-succeed on a push to `main`. Pull requests build documentation for review but
-cannot deploy. No `pull_request_target`, privileged `workflow_run` handler, domain change, or additional token is used. The deployment job has only `pages: write`
-and `id-token: write`; it does not check out or execute repository code.
+The read-only `stable-manual` builder in `verify.yml` runs only after successful verification,
+package/image finalization, immutable release publication and public consumption on
+`main`. Pull requests and pre-publication package jobs build development previews;
+they cannot deploy. No additional token or permission grant is introduced. The
+builder uses only `contents: read` to check the release and build/test its manual.
+The separate `documentation` deployment job retains only `pages: write` and
+`id-token: write`. It never checks out or executes repository code, installs
+dependencies, runs containers or starts a browser.
 
-Inside its deployment concurrency lock, the job reads the public repository's
-current `main` ref without credentials. A stale run skips every artifact and
-publication step, including when an older run is rerun after a newer deployment.
-A missing, malformed or unavailable ref fails closed. No extra token permission
-is needed. The job does not cancel release jobs.
+The release tag must resolve to the same commit as the verified workflow. Its
+published stable release record must be immutable and match the selected version.
+Inside the deployment concurrency lock, the job reads the public repository's
+current `main` without credentials immediately before the deployment action. Stale runs skip delivery; missing, malformed
+or unavailable refs fail closed. Release jobs are not cancelled.
 
-For a current run, it downloads `documentation-0.0.0-amd64` from the same workflow run, packages its
-existing HTML, and deploys it to the `github-pages` environment. All directly
-invoked Actions are pinned to commit hashes. Native tar plus the pinned artifact
-uploader follows the Pages artifact format without a composite uploader's floating
-nested Action. Publication does not rebuild or replace measured scenario outcomes.
+The builder downloads the same run's versioned package images,
+wheelhouse and scenario results. It rebuilds the manual from the checked release
+tag and tested packages, checks browser behavior, and uploads
+`released-manual-VERSION-amd64` for review. The root wheel hash must match the
+GitHub SHA-256 digest of that wheel asset in the actual immutable release; a
+same-run archive alone is insufficient. Missing release asset digests fail closed.
 
-The manual's provenance page links the source commit and verification run and
-records the root wheel digest, pinned reporter release and scenario source digest.
-`feature-results.json` preserves the five scenario outcomes. Candidate package
-version `0.0.0` is not a released package version. The hosted snapshot is not an
-exhaustive coverage claim or a live verification service.
+The builder uploads the Pages tar once as `github-pages-RUN_ID-BUILD_ATTEMPT`,
+without overwrite, and emits its native artifact ID and tar SHA-256. Deployment
+reads the artifact independently by exact native ID and exact attempt-qualified
+name using the same-run artifact service. Each lookup permits at most one
+workflow retry after failure, with a separate staging directory for every read.
+Both successful readbacks must match the builder tar SHA-256 without extracting
+the tar. Failure or mismatched bytes block deployment. The same verified name
+is passed to the pinned Pages action. A deploy-only retry may
+reuse the successful builder attempt; it cannot select an unrelated artifact. It does not regenerate
+or replace scenario outcomes. All directly invoked Actions retain full commit pins.
+
+Visible identity and `build.json` record the release tag, version, source commit,
+verification run, wheel digest, reporter release and scenario source digest.
+Candidate `0.0.0` output remains a preview; it cannot become a stable manual by
+renaming an artifact. This is bounded verification, not an exhaustive coverage claim.
+See [release operation](RELEASE.md#released-manual-delivery) for delivery-only retry
+using the same existing release without creating another tag.
 
 ## One-time repository setup
 
@@ -65,7 +81,7 @@ there after each renderer change. Then:
   website/homepage when its verified destination changes. The current README and
   homepage already link the canonical manual.
 
-The one-day `github-pages` artifact is deployment staging. The existing review
+The one-day `github-pages-RUN_ID-BUILD_ATTEMPT` artifact is deployment staging. The existing review
 artifact has 14-day retention. Neither expiration removes the deployed manual:
 the hosted site remains until replaced, unpublished, or Pages is disabled. This
 setup is a single current manual, not permanent per-release archives or retention
