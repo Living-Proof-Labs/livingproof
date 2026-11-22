@@ -31,7 +31,9 @@ def task_reference(root, source):
 def add_identity(site):
     provenance = json.loads((site / 'build.json').read_text())
     revision = provenance['source_commit']
-    label = f'Docs: development · {revision[:7]}'
+    channel = provenance.get('channel', 'preview')
+    version = provenance.get('release_tag') if channel == 'release' else 'development preview'
+    label = f'Docs: {version} · {revision[:7]}'
     if provenance['source_dirty']:
         label += ' · local changes'
     for page in site.rglob('*.html'):

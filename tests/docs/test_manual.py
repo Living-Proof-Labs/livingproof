@@ -340,7 +340,8 @@ def test_shared_navigation_identity_and_keyboard(browser, server, output, width)
     expect(footer.get_by_role('link', name='Documentation home')).to_have_attribute(
         'href', 'https://docs.livingprooflabs.com/')
     build = json.loads((output / 'html/build.json').read_text())
-    identity = footer.get_by_role('link', name=re.compile('Docs: development'))
+    label = build['release_tag'] if build['channel'] == 'release' else 'development preview'
+    identity = footer.get_by_role('link', name=re.compile(re.escape(f'Docs: {label}')))
     expect(identity).to_have_attribute('href', build['source_url'])
     expect(identity).to_contain_text(build['source_commit'][:7])
     version = footer.get_by_role('link', name='Version and source')
