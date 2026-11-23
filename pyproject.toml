@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSES/*.txt", "LICENSE.md"]
-dependencies = ["livingproof-common==1.0.0", "click==8.5.0", "packaging==25.0"]
+dependencies = ["livingproof-common==1.0.0", "click==8.5.1", "packaging==25.0"]
 
 [project.scripts]
 livingproof = "livingproof.cli:main"
