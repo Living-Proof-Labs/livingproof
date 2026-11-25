@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Publish the verified documentation
 
 The read-only `stable-manual` builder in `verify.yml` runs only after successful verification,

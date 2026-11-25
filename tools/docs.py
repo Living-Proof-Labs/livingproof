@@ -85,7 +85,9 @@ def stage():
         manifest.append({'source': source, 'page': destination,
                          'sha256': hashlib.sha256(content.encode()).hexdigest()})
     license_text = (ROOT / 'LICENSE').read_text()
-    (common / 'license.md').write_text(f'# License\n\n```text\n{license_text.rstrip()}\n```\n')
+    # Keep the published #license-boundaries anchor for existing links.
+    (common / 'license.md').write_text(
+        f'# License\n\n<a id="license-boundaries"></a>\n\n```text\n{license_text.rstrip()}\n```\n')
     manifest.append({'source': 'LICENSE', 'page': 'license.md',
                      'sha256': hashlib.sha256(license_text.encode()).hexdigest()})
     assets = common / 'assets'

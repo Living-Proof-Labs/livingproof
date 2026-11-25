@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Release operation
 
 Native amd64 and arm64 CI builds wheel/source, pure-Python `all.deb`, and root-only

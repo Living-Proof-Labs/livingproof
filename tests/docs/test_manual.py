@@ -31,10 +31,20 @@ class Document(HTMLParser):
 
 def test_repository_markdown_is_single_source(output):
     manifest = json.loads((output / 'source-manifest.json').read_text())
+    sources = {item['source'] for item in manifest}
+    # One Apache-2.0 LICENSE is the only license source (collaboration-guidelines#162).
+    assert 'LICENSE' in sources
+    assert not any(s == 'LICENSE.md' or s.startswith('LICENSES/') for s in sources)
     for item in manifest:
         original = (ROOT / item['source']).read_text()
         assert hashlib.sha256(original.encode()).hexdigest() == item['sha256']
         common = (output / 'source' / item['page']).read_text()
+        if item['source'] == 'LICENSE':
+            # Plain-text LICENSE is wrapped verbatim under the legacy anchor.
+            assert item['page'] == 'license.md'
+            assert original.rstrip() in common
+            assert '<a id="license-boundaries"></a>' in common
+            continue
         # Body is unchanged: only link targets are rewritten for local rendering.
         def strip_targets(s):
             return re.sub(r'\[([^\]]+)\]\([^\s)]+\)', r'[\1]', s)
