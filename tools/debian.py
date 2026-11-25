@@ -47,9 +47,7 @@ Description: Thin Living Proof Labs command with installed plugin discovery
             script.chmod(0o755)
         documentation = stage / "usr/share/doc/livingproof"
         documentation.mkdir(parents=True)
-        (documentation / "copyright").write_text((ROOT / "LICENSE.md").read_text())
-        for license in (ROOT / "LICENSES").iterdir():
-            (documentation / license.name).write_bytes(license.read_bytes())
+        (documentation / "copyright").write_text((ROOT / "LICENSE").read_text())
         stage.chmod(0o755)
         for path in stage.rglob("*"):
             path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)

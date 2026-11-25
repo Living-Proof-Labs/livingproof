@@ -9,7 +9,7 @@ description = "Living Proof Labs command home for installed capability plugins"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-license-files = ["LICENSES/*.txt", "LICENSE.md"]
+license-files = ["LICENSE"]
 dependencies = ["livingproof-common==1.0.0", "click==8.5.1", "packaging==25.0"]
 
 [project.scripts]

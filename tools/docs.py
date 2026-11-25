@@ -28,7 +28,6 @@ SOURCES = {
     '.github/PAGES.md': 'maintainers/pages.md',
     '.github/RELEASE.md': 'maintainers/releases.md',
     'AGENTS.md': 'maintainers/working-agreement.md',
-    'LICENSE.md': 'license.md',
     'docs/decisions/zensical.md': 'maintainers/docs-decision.md',
 }
 NAV = [
@@ -52,8 +51,7 @@ NAV = [
 
 def rewrite_links(text, source):
     """Rewrite only links to allowlisted local pages/assets, retaining prose and fragments."""
-    targets = {**SOURCES, 'tests/features/installed.feature': 'scenarios.md',
-               **{f'LICENSES/{p.name}': f'assets/{p.name}' for p in (ROOT / 'LICENSES').glob('*.txt')}}
+    targets = {**SOURCES, 'LICENSE': 'license.md', 'tests/features/installed.feature': 'scenarios.md'}
 
     def replace(match):
         target = urlsplit(match[2])
@@ -86,10 +84,14 @@ def stage():
         target.write_text(rewrite_links(content, source))
         manifest.append({'source': source, 'page': destination,
                          'sha256': hashlib.sha256(content.encode()).hexdigest()})
+    license_text = (ROOT / 'LICENSE').read_text()
+    # Keep the published #license-boundaries anchor for existing links.
+    (common / 'license.md').write_text(
+        f'# License\n\n<a id="license-boundaries"></a>\n\n```text\n{license_text.rstrip()}\n```\n')
+    manifest.append({'source': 'LICENSE', 'page': 'license.md',
+                     'sha256': hashlib.sha256(license_text.encode()).hexdigest()})
     assets = common / 'assets'
     assets.mkdir()
-    for license_file in (ROOT / 'LICENSES').glob('*.txt'):
-        shutil.copyfile(license_file, assets / license_file.name)
     shutil.copyfile(ROOT / 'tests/features/installed.feature', assets / 'installed.feature')
     rows = results(ROOT / 'artifacts/feature-tests.xml')
     (common / 'feature-results.json').write_text(json.dumps(rows, indent=2) + '\n')

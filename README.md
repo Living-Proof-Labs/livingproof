@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # LivingProof
 
 **[Start here: documentation](https://docs.livingprooflabs.com/livingproof/)**
@@ -227,8 +227,7 @@ installed smoke tests and release handling. The pinned shared baseline is
 Read [the plugin contract](docs/plugins.md) before adding a plugin. Keep the root
 small and link versioned ecosystem documentation rather than copying it here.
 
-Original tooling and reusable examples are Apache-2.0; original written content
-is CC BY 4.0. See [explicit license boundaries](LICENSE.md).
+Original tooling, reusable examples, and written content are [Apache-2.0](LICENSE).
 
 ## Identify the build being tested
 

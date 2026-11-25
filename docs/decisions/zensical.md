@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Use Zensical for the Markdown manual
 
 On 2026-10-27 the owner preferred Zensical's modern Material-style experience

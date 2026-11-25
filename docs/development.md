@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Development and installed-consumer verification
 
 The Docker development target supplies Python 3.12, uv 0.12.23, Task 3.54.0 and

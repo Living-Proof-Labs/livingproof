@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Installed-user verification pilot and generated documentation
 
 [Project home](../README.md) · [Executable scenarios](../tests/features/installed.feature) ·
